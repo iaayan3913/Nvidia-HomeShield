@@ -95,7 +95,9 @@ export function OperationsPortal() {
   const caseMarkers = useMemo(() => buildCaseMarkers(state, lookups), [state, lookups]);
   const workerMarkers = useMemo(() => buildWorkerMarkers(state, lookups), [state, lookups]);
   const active = useMemo(() => buildRoutes(state.active_plan, lookups, 'active'), [state.active_plan, lookups]);
-  const proposed = useMemo(() => buildRoutes(reviewPlan, lookups, 'proposed'), [reviewPlan, lookups]);
+  // Pending (unapproved) routes are only drawn while the officer is reviewing them in the Schedule drawer;
+  // otherwise a full-day proposal covers the city in dashed lines that nobody has asked to see.
+  const proposed = useMemo(() => buildRoutes(drawer.open ? reviewPlan : null, lookups, 'proposed'), [drawer.open, reviewPlan, lookups]);
   const densityPoints = useMemo(() => state.cases.flatMap((c) => { const p = lookups.properties.get(c.property_id); return p ? [[p.lon, p.lat] as LonLat] : []; }), [state.cases, lookups]);
 
   // Re-plan morph: remember the previous plan's routes and morph them into the newly approved ones.

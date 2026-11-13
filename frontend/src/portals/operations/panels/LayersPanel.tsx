@@ -69,7 +69,7 @@ export function LayersPanel({ layers, onChange, dataPreference, onDataPreference
       <span className="ops-layers__heading">Routes</span>
       <ul>
         <li><span className="ops-line ops-line--active" aria-hidden="true" />Approved route, solid</li>
-        <li><span className="ops-line ops-line--proposed" aria-hidden="true" />Proposed route, dashed: awaiting approval</li>
+        <li><span className="ops-line ops-line--proposed" aria-hidden="true" />Proposed route, dashed: shown while reviewing in Schedule</li>
         <li><span className="ops-swatch ops-swatch--selected" aria-hidden="true" />Selected case (green ring)</li>
       </ul>
     </div>
