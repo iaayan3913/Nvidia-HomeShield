@@ -23,9 +23,9 @@ Use `USE_MOCKS=true` first. Add real intake and scheduler by changing configurat
 
 ## Checklist
 
-- [ ] `/health`, OpenAPI docs, and case CRUD work.
-- [ ] YAML deadline rules and working-day tests pass.
-- [ ] Approval is required before consequential actions.
-- [ ] Intake and scheduler are connected behind stable interfaces.
-- [ ] SSE emits case, plan, and agent events.
-- [ ] Emergency re-plan and offline seed data work.
+- [X] `/health`, OpenAPI docs, and case CRUD work.
+- [X] YAML deadline rules and working-day tests pass.
+- [X] Approval is required before consequential actions.
+- [X] Intake and scheduler are connected behind stable interfaces.
+- [X] SSE emits case, plan, and agent events.
+- [X] Emergency re-plan and offline seed data work.
