@@ -60,6 +60,7 @@ a { color: inherit; }
 
 .topbar { height: 64px; padding: 0 clamp(1rem,3vw,2rem); display: grid; grid-template-columns: minmax(150px,1fr) auto minmax(150px,1fr); align-items: center; gap: var(--space-5); border-bottom: 1px solid var(--border); background: rgb(255 255 255 / .96); position: sticky; top: 0; z-index: 50; }
 .brand { display: inline-flex; align-items: center; gap: .65rem; width: fit-content; color: var(--ink-900); font: 700 1.05rem/1 var(--font-display); text-decoration: none; letter-spacing: -.02em; }
+.brand-logo { width: 30px; height: 30px; display: block; object-fit: contain; }
 .brand-mark { width: 30px; height: 30px; display: inline-grid; place-items: center; color: var(--graphite-950); background: var(--green-500); font: 800 1rem/1 var(--font-display); clip-path: polygon(0 0,100% 0,100% 72%,72% 100%,0 100%); }
 .portal-nav { display: flex; align-items: center; gap: var(--space-1); }
 .portal-link { display: inline-flex; align-items: center; gap: .45rem; padding: .55rem .75rem; border-radius: var(--radius-md); color: var(--ink-500); text-decoration: none; font-weight: 600; transition: color var(--motion-fast), background var(--motion-fast); }

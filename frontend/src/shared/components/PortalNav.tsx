@@ -12,7 +12,7 @@ export function PortalNav() {
   return (
     <header className="topbar">
       <NavLink className="brand" to="/report" aria-label="HomeShield home">
-        <span className="brand-mark" aria-hidden="true">H</span>
+        <img className="brand-logo" src="/logo.png" alt="" />
         <span>HomeShield</span>
       </NavLink>
       <nav className="portal-nav" aria-label="Portal navigation">
