@@ -79,3 +79,9 @@ def test_model_output_is_normalised_and_emergency_is_consistent():
     assert case.hazard_type == HazardType.leak and case.vulnerable_occupants == ["elderly"]
     assert case.severity == Severity.emergency and case.is_emergency
     assert not real.parse_case('{"hazard_type":"leak","severity":"moderate","is_emergency":false}', "r").is_emergency
+
+
+def test_damp_mould_with_vulnerable_occupants_is_at_least_significant():
+    raw = '{"hazard_type":"damp_mould","severity":"moderate","vulnerable_occupants":%s}'
+    assert real.parse_case(raw % '["child"]', "r").severity == Severity.significant
+    assert real.parse_case(raw % '[]', "r").severity == Severity.moderate

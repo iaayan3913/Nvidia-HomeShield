@@ -23,7 +23,7 @@ Implement mock-first, then configure the endpoint from `.env`. Test mould, leak,
 
 ## Checklist
 
-Still open: hosted Nano Omni verified on all 3 demo photos (8-13s each); still need the Spark endpoint from Person 1, then the 15:00 decision (Spark, hosted, or mock). Optional: a short test voice note (`demo-photos/socket.mp3`).
+All done (12:30): Spark Nano Omni verified on all 3 demo photos (2-6s) and a wav voice note; hosted backup and mock give matching results. Before the demo, re-run `py -3.13 -m intake.try_live`.
 
 - [x] `analyse_report()` accepts text, photo, and audio references. _Note: photo + audio via backend uploads; audio off until Person 1 confirms format._
 - [x] Mould, leak, and electrical fixtures parse. _Note: tested; demo photos in `demo-photos/`._
