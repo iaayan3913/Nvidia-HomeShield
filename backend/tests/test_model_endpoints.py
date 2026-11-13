@@ -85,7 +85,8 @@ def test_llm_clients_send_requests_to_their_own_base_urls(monkeypatch):
     assert [request["model"] for request in requests] == ["omni", "lightning", "hosted"]
     assert "extra_body" not in requests[0]
     assert requests[1]["extra_body"] == {
-        "chat_template_kwargs": {"enable_thinking": False}
+        "chat_template_kwargs": {"enable_thinking": False},
+        "reasoning_effort": "none",  # the only thinking switch Ollama honours for Lightning
     }
     assert "extra_body" not in requests[2]
 

@@ -40,12 +40,20 @@ class PythonToolAgent:
         if not self.use_model:
             return deterministic
         client = self.client or AgentLLMClient()
+        # The model must know the permitted tool names and the required order, or it invents tools
+        # (e.g. "get_case_details") and the run falls back to the deterministic sequence.
         reply = client.complete([
             {"role": "system", "content": (
-                "Select safe HomeShield backend tools. Return JSON only as "
-                "{\"actions\":[{\"name\":\"tool_name\",\"arguments\":{...}}]}. "
-                "Do not include private reasoning. Consequential actions must request approval.")},
-            {"role": "user", "content": f"Coordinate the next safe actions for case ID {case_id}."},
+                "You coordinate HomeShield repair cases by choosing backend tools. Return JSON only, no prose, "
+                "in the form {\"actions\":[{\"name\":\"<tool>\",\"arguments\":{}}]}. "
+                f"Permitted tool names: {', '.join(sorted(TOOL_NAMES))}. "
+                "Plan every action for this turn at once. A new case must always include compute_deadlines, then "
+                "schedule_job, then request_approval with action commit_plan, in that order; you may add get_case "
+                "or get_repair_history first. Never notify or escalate without approval. Do not include private "
+                "reasoning. Example: {\"actions\":[{\"name\":\"get_case\",\"arguments\":{}},"
+                "{\"name\":\"compute_deadlines\",\"arguments\":{}},{\"name\":\"schedule_job\",\"arguments\":{}},"
+                "{\"name\":\"request_approval\",\"arguments\":{\"action\":\"commit_plan\"}}]}")},
+            {"role": "user", "content": f"Coordinate the next safe actions for new case ID {case_id}."},
         ], temperature=0, timeout=self.timeout_seconds)
         raw = reply["content"]
         start, end = raw.find("{"), raw.rfind("}")

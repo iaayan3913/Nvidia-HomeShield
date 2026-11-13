@@ -50,7 +50,10 @@ class AgentLLMClient(LLMClient):
         # chat template. Keep it on the agent client so Nano Omni intake is
         # unaffected.
         if self.chat_template_control:
-            kwargs.setdefault("extra_body", {
-                "chat_template_kwargs": {"enable_thinking": self.enable_thinking}
-            })
+            body = {"chat_template_kwargs": {"enable_thinking": self.enable_thinking}}
+            if not self.enable_thinking:
+                # Ollama ignores chat_template_kwargs for Nemotron Lightning; only reasoning_effort="none"
+                # stops it spending the whole token budget on hidden reasoning (0.2 s vs. a timeout).
+                body["reasoning_effort"] = "none"
+            kwargs.setdefault("extra_body", body)
         return super().complete(messages, **kwargs)
