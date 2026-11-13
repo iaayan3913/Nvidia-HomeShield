@@ -6,6 +6,9 @@ __pycache__/
 node_modules/
 dist/
 *.sqlite3
+*.sqlite3-*
 frontend/public/roads.geojson
 frontend/public/buildings.geojson
 data/generated/
+data/raw/
+data/processed/
