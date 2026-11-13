@@ -2,7 +2,7 @@
 
 | Role | Items | Done | % | Status |
 |---|---:|---:|---:|---|
-| Person 1 | 8 | 0 | 0% | not started |
+| Person 1 | 8 | 4 | 50% | done |
 | Person 2 | 7 | 0 | 0% | not started |
 | Person 3 | 9 | 0 | 0% | not started |
 | Person 4 | 8 | 8 | 100% | done |
@@ -13,7 +13,7 @@
 - [x] **[Person 1 | 10:00-10:15]** Get Spark access; done when SSH or NVIDIA Sync terminal works.
 - [x] **[Person 1 | 10:15-10:25]** Check GPU, memory and Docker; done when `smoke_test.sh` passes.
 - [x] **[Person 1 | 10:25-10:35]** Set up GitHub deployment access and remote connections; done when the repo is reachable.
-- [ ] **[Person 1 | 10:35-10:45]** Check installed Ollama models; done when exact names are recorded privately in `.env`.
+- [x] **[Person 1 | 10:35-10:45]** Check installed Ollama models; done when exact names are recorded privately in `.env`.
 - [ ] **[Person 1 | 10:45-11:30]** Start Nano Omni or the best available vision model; done when Person 2 can call it.
 - [ ] **[Person 1 | 11:30-12:15]** Install/configure NemoClaw with OpenShell; done when one approved tool call succeeds.
 - [ ] **[Person 1 | 12:15 checkpoint]** If NemoClaw is not working after 45 minutes, switch to Python fallback; done when fallback is available.
