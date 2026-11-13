@@ -1,16 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { PortalNav } from '../shared/components/PortalNav';
-import { homeShieldService } from '../shared/data';
 
-export function AppShell() {
+/** Shared page frame. `data-portal` is a styling hook only; the colour theme lives on <html data-theme>. */
+export function AppShell({ nav = <PortalNav />, title }: { nav?: ReactNode; title: string }) {
   const { pathname } = useLocation();
-  const theme = pathname.startsWith('/operations') ? 'operations' : pathname.startsWith('/operative') ? 'operative' : 'resident';
-  useEffect(() => { void homeShieldService.start(); return () => homeShieldService.stop(); }, []);
+  const portal = pathname.startsWith('/operations') ? 'operations' : pathname.startsWith('/operative') ? 'operative' : 'resident';
+  useEffect(() => { document.title = title; }, [title]);
   return (
-    <div className="app" data-portal={theme}>
+    <div className="app" data-portal={portal}>
       <a className="skip-link" href="#main-content">Skip to main content</a>
-      <PortalNav />
+      {nav}
       <main id="main-content" tabIndex={-1}><Outlet /></main>
     </div>
   );

@@ -92,7 +92,7 @@ describe('Resident app', () => {
   });
 
   it('submits a not-listed address through the structured address fields', async () => {
-    const spy = vi.spyOn(mockService, 'createReport').mockImplementation(() => fakeResult('HS-55555'));
+    const spy = vi.spyOn(mockService, 'createReport').mockImplementation(async () => fakeResult('HS-55555'));
     renderPortal();
     await fillToReview({ manualAddress: true });
     fireEvent.click(screen.getByRole('button', { name: /submit repair report/i }));
@@ -107,7 +107,7 @@ describe('Resident app', () => {
     const first = deferred<{ report: Report; case: Case }>();
     const spy = vi.spyOn(mockService, 'createReport')
       .mockImplementationOnce(() => first.promise as never)
-      .mockImplementationOnce(() => fakeResult('HS-88888'));
+      .mockImplementationOnce(async () => fakeResult('HS-88888'));
     renderPortal();
     await fillToReview({ withPhoto: true });
     const submit = screen.getByRole('button', { name: /submit repair report/i });
@@ -154,9 +154,9 @@ describe('Resident app', () => {
     expect(document.body.textContent).not.toMatch(/Hussain/);
     await act(async () => { await mockService.updateJobProgress(job.id, 'on_site'); });
     expect(await screen.findByText('Your operative is at your home')).toBeTruthy();
-    await act(async () => { await mockService.updateJobProgress(job.id, 'unable_to_complete'); });
+    await act(async () => { await mockService.updateJobProgress(job.id, 'unable_to_complete', 'Parts needed'); });
     expect(await screen.findByText('The repair could not be completed on this visit')).toBeTruthy();
-    await act(async () => { await mockService.updateJobProgress(job.id, 'completed'); });
+    await act(async () => { await mockService.updateJobProgress(job.id, 'on_site'); await mockService.updateJobProgress(job.id, 'completed', 'Repaired'); });
     expect(await screen.findByText('Repair completed')).toBeTruthy();
   });
 

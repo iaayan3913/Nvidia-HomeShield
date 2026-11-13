@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from threading import RLock
 from uuid import uuid4
 
@@ -17,9 +18,10 @@ from backend.schemas import (
 from intake.agent import analyse_report
 from scheduler import diff_plans, get_scheduler, validate_plan
 from scheduler.core import naive_utc, utcnow
-from scheduler.fixtures import case_to_job
+from scheduler.fixtures import _raw, case_to_job, property_location
 from scheduler.service import SchedulingService
 from store.sqlite import Store
+from backend.records import PrivateRecords
 from backend.uploads import StoredUpload, UploadStore
 
 
@@ -44,6 +46,7 @@ class HomeShieldService:
         self.upload_store = upload_store or UploadStore()
         self.intake_audio_enabled = intake_audio_enabled
         self._decision_lock = RLock()
+        self.records = PrivateRecords(self.store.path)
         self._agent_lock = RLock()
         self._agent_plans: dict[str, Plan] = {}
         self._agent_approvals: dict[str, Approval] = {}
@@ -119,6 +122,7 @@ class HomeShieldService:
         case.deadlines = compute_deadlines(case, now=case.created_at)
         case.status = CaseStatus.awaiting_approval
         self.store.save_case(case, "Case created and queued for approval")
+        self._save_private_details(case.id, report)
         self.emit("case.created", "Housing case created", case.id, payload={"severity": case.severity.value})
         deadline_event = "deadline.review_required" if case.deadlines.review_required else "deadline.calculated"
         self.emit(deadline_event, "Deadline policy evaluated", case.id,
@@ -235,6 +239,8 @@ class HomeShieldService:
         # processes, avoiding stale ETAs while keeping legal dates untouched.
         clock_offset = scheduler_now - utcnow()
         jobs = dict(self.scheduling.jobs)
+        completed = {job_id for job_id, record in self.records.list_progress().items() if record["status"] == "completed"}
+        jobs = {job_id: job for job_id, job in jobs.items() if job_id not in completed}
         for case in self.store.list_cases():
             if case.status == CaseStatus.resolved:
                 continue
@@ -393,3 +399,124 @@ class HomeShieldService:
         self.emit("case.created", "Synthetic demo case seeded", case.id)
         return 1
 
+
+    # ---- Round 2 platform additions (additive) -------------------------------------------------
+
+    def _save_private_details(self, case_id: str, report: ReportIn) -> None:
+        details: dict = {}
+        if report.contact:
+            details["contact"] = report.contact.model_dump(exclude_none=True)
+        if report.address_line or report.postcode:
+            details["address"] = {"address_line": report.address_line, "postcode": report.postcode}
+        if details:
+            self.records.save_contact(case_id, details)
+
+    def list_properties(self, query: str = "", limit: int = 50) -> list[dict]:
+        items = _property_register()
+        q = query.strip().lower()
+        if q:
+            first = q.split()[0]
+            items = tuple(p for p in items if p["district"].lower() == first or p["id"].lower() == q
+                          or q in p["area"].lower() or q in p["display_address"].lower())
+        return list(items[:limit])
+
+    def public_case(self, case_id: str) -> dict:
+        """Resident-safe view: no evidence references, occupants or classification internals."""
+        data = self.require_case(case_id).model_dump(mode="json")
+        return {key: data[key] for key in PUBLIC_CASE_FIELDS}
+
+    def list_jobs(self) -> list[dict]:
+        active = self.store.latest_active_plan()
+        assigned = {stop.job_id for route in active.workers for stop in route.stops} if active else set()
+        progress = self.records.list_progress()
+        seeds = {item["id"]: item for item in _seed_jobs()}
+        known: dict[str, tuple] = {}
+        for job in self.scheduling.jobs.values():
+            seed = seeds.get(job.id, {})
+            known[job.id] = (job, {"property_id": seed.get("property_id"), "hazard_type": seed.get("hazard_type"),
+                                   "severity": seed.get("severity"), "source": "planned", "access_notes": None})
+        for case in self.store.list_cases():
+            if not property_location(case.property_id):
+                self.scheduling.resolve_property(case)  # deterministic; not saved here
+            try:
+                # Same demo-clock translation as _jobs_for_proposal, so listed windows match planned ones.
+                job = case_to_job(case, now=naive_utc(case.created_at) + (self.scheduling.clock.now() - utcnow()))
+            except ValueError:
+                continue
+            contact = (self.records.get_contact(case.id) or {}).get("contact", {})
+            known[job.id] = (job, {"property_id": case.property_id, "hazard_type": case.hazard_type.value,
+                                   "severity": case.severity.value, "source": "case",
+                                   "access_notes": contact.get("access_notes")})
+        result = []
+        for job_id, (job, meta) in known.items():
+            record = progress.get(job_id)
+            status = record["status"] if record else "assigned" if job_id in assigned else "unassigned"
+            result.append({**job.model_dump(mode="json"), **meta, "status": status,
+                           "completion_notes": record["notes"] if record else None,
+                           "evidence_count": record["evidence_count"] if record else None,
+                           "updated_at": record["updated_at"] if record else None})
+        return result
+
+    def record_job_progress(self, job_id: str, status: str, notes: str | None, evidence_count: int | None) -> dict:
+        with self._decision_lock:
+            job = next((item for item in self.list_jobs() if item["id"] == job_id), None)
+            if not job:
+                raise KeyError("job not found")
+            if job["status"] == "unassigned":
+                raise ValueError("This job is not on the approved active schedule")
+            if status not in JOB_TRANSITIONS.get(job["status"], set()):
+                raise ValueError(f"A job cannot move from {job['status']} to {status}")
+            record = self.records.save_progress(job_id, job["case_id"], status, notes, evidence_count)
+            case = self.store.get_case(job["case_id"])
+            new_status = {"on_site": CaseStatus.in_progress, "completed": CaseStatus.resolved}.get(status)
+            if case and new_status and case.status != new_status:
+                case.status = new_status
+                self.store.save_case(case, f"Operative marked the job {status.replace('_', ' ')}")
+                self.emit("case.status_changed", "Case updated from operative progress", case.id,
+                          payload={"status": new_status.value})
+            # Notes stay private to /api/jobs; the event carries only safe identifiers.
+            self.emit("job.progress", f"Operative marked a job {status.replace('_', ' ')}",
+                      case.id if case else None, payload={"job_id": job_id, "status": status})
+            return {**job, "status": status, "completion_notes": notes, "evidence_count": evidence_count,
+                    "updated_at": record["updated_at"]}
+
+    def latest_event_sequence(self) -> int:
+        with self.store.lock:
+            return int(self.store.connection.execute("SELECT COALESCE(MAX(sequence),0) FROM events").fetchone()[0])
+
+    def reset(self) -> None:
+        """Development-only: delete every case, plan, approval, event and private record."""
+        with self._decision_lock:
+            with self.store.transaction() as db:
+                for table in ("case_history", "approvals", "plans", "cases", "events"):
+                    db.execute(f"DELETE FROM {table}")
+            self.records.clear()
+            with self._agent_lock:
+                self._agent_plans.clear()
+                self._agent_approvals.clear()
+            self.scheduling._plan = None
+        self.emit("system.reset", "Development data was reset")
+
+
+JOB_TRANSITIONS = {
+    "assigned": {"travelling", "on_site", "unable_to_complete"},
+    "travelling": {"on_site", "unable_to_complete"},
+    "on_site": {"completed", "unable_to_complete"},
+    "unable_to_complete": {"travelling", "on_site"},  # return visit, e.g. after collecting parts
+}
+PUBLIC_CASE_FIELDS = ("id", "hazard_type", "severity", "is_emergency", "status", "summary", "room",
+                      "deadlines", "property_id", "created_at", "updated_at")
+
+
+@lru_cache(maxsize=1)
+def _seed_jobs() -> tuple[dict, ...]:
+    return tuple(_raw("jobs"))
+
+
+@lru_cache(maxsize=1)
+def _property_register() -> tuple[dict, ...]:
+    # The register is sample stock: it has an area and postcode district but no street address.
+    return tuple({"id": p["id"], "display_address": f"Home {p['id']}, {p['area']}", "postcode": p["district"],
+                  "district": p["district"], "area": p["area"], "lat": p["lat"], "lon": p["lon"],
+                  "archetype": p["archetype"], "floors": p["floors"], "bedrooms": p["bedrooms"], "synthetic": True}
+                 for p in _raw("properties"))

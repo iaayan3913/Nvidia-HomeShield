@@ -1,36 +1,52 @@
+/**
+ * Compatibility layer: the earlier `shared/data` API, now backed by the round-2 contract data service
+ * (`shared/mock`: HTTP + SSE via the /api proxy, or the local service). New code should import from
+ * `shared/mock` (`mockService`, `useDemoState`, `useConnection`) instead.
+ */
 import { useSyncExternalStore } from 'react';
-import { mockService } from '../mock/mockService';
-import type { ConnectionState, CreateReportInput, DataSourceMode, DemoState, JobStatus, ReportMedia } from '../types/domain';
-import { ApiHomeShieldService } from './ApiHomeShieldService';
+import { connectionStore, DATA_MODE, switchDataSource } from '../mock/connection';
+import { mockService, startLiveData } from '../mock/service';
+import { useDemoState } from '../mock/useDemoState';
+import type { Connection, ConnectionState, DataSourceMode } from '../types/domain';
 
-const configuredMode:DataSourceMode=import.meta.env.VITE_DATA_SOURCE==='api'?'api':'mock';
-const stored=typeof localStorage!=='undefined'?localStorage.getItem('homeshield.data-source.override'):null;
-export const dataSourceMode:DataSourceMode=stored==='mock'||stored==='api'?stored:configuredMode;
-export const apiUrl=(import.meta.env.VITE_API_URL||'http://127.0.0.1:18100').replace(/\/$/,'');
-export const isApiMode=dataSourceMode==='api';
-export const apiService=new ApiHomeShieldService(apiUrl);
+export const dataSourceMode: DataSourceMode = DATA_MODE === 'api' ? 'api' : 'mock';
+export const isApiMode = DATA_MODE === 'api';
+export { switchDataSource, useDemoState };
 
-const mockConnection:ConnectionState={mode:'mock',status:'demo',message:'Deterministic offline demonstration'};
-const selected=isApiMode?apiService:mockService;
+let lastConnection: Connection | null = null; let lastState: ConnectionState | null = null;
+/** Maps the contract connection onto the older status names; cached so React sees a stable snapshot. */
+export function toConnectionState(connection: Connection): ConnectionState {
+  if (connection === lastConnection && lastState) return lastState;
+  const status: ConnectionState['status'] = connection.mode === 'local' ? 'demo' : connection.status === 'live' ? 'connected' : connection.status === 'connecting' ? 'connecting' : 'reconnecting';
+  const message = status === 'demo' ? 'Local data on this device' : status === 'connected' ? 'Live updates connected' : status === 'connecting' ? 'Connecting to HomeShield' : 'Connection lost; retrying automatically';
+  lastConnection = connection; lastState = { mode: dataSourceMode, status, message };
+  return lastState;
+}
+const getConnection = () => toConnectionState(connectionStore.get());
 
-export const homeShieldService={
-  getState:()=>selected.getState(), subscribe:(fn:()=>void)=>selected.subscribe(fn),
-  start:()=>isApiMode?apiService.start():Promise.resolve(), stop:()=>{if(isApiMode)apiService.stop()},
-  retry:()=>isApiMode?apiService.retry():Promise.resolve(),
-  getConnection:()=>isApiMode?apiService.getConnection():mockConnection,
-  subscribeConnection:(fn:()=>void)=>isApiMode?apiService.subscribeConnection(fn):()=>{},
-  createReport:(input:CreateReportInput,media?:ReportMedia)=>isApiMode?apiService.createReport(input,media):Promise.resolve({...mockService.createReport(input),plan:null,approval:null,warnings:[]}),
-  generateScheduleProposal:(caseId?:string)=>isApiMode?apiService.generateScheduleProposal(caseId):Promise.resolve(mockService.generateScheduleProposal(caseId)),
-  approveProposal:(planId:string,by?:string)=>isApiMode?apiService.approveProposal(planId,by):Promise.resolve(mockService.approveProposal(planId,by)),
-  rejectProposal:(planId:string,reason:string,by?:string)=>isApiMode?apiService.rejectProposal(planId,reason,by):Promise.resolve(mockService.rejectProposal(planId,reason,by)),
-  simulateEmergency:()=>isApiMode?apiService.simulateEmergency():Promise.resolve({...mockService.simulateEmergency(),warnings:[]}),
-  updateJobProgress:(jobId:string,status:JobStatus,notes?:string)=>isApiMode?apiService.updateJobProgress(jobId,status,notes):Promise.resolve(mockService.updateJobProgress(jobId,status,notes)),
-  recordActivity:(event:Parameters<typeof mockService.recordActivity>[0])=>{if(!isApiMode)mockService.recordActivity(event)},
-  reset:()=>isApiMode?apiService.reset():mockService.reset(),
+export const homeShieldService = {
+  getState: mockService.getState,
+  subscribe: mockService.subscribe,
+  start: async () => { startLiveData(); },
+  stop: () => undefined, // the live connection is shared by the whole app and stays open
+  retry: async () => { startLiveData(); },
+  getConnection,
+  subscribeConnection: connectionStore.subscribe,
+  // Looked up at call time so wrappers (and test spies) on mockService are respected.
+  createReport: (...args: Parameters<typeof mockService.createReport>) => mockService.createReport(...args),
+  generateScheduleProposal: (...args: Parameters<typeof mockService.generateScheduleProposal>) => mockService.generateScheduleProposal(...args),
+  approveProposal: (...args: Parameters<typeof mockService.approveProposal>) => mockService.approveProposal(...args),
+  rejectProposal: (...args: Parameters<typeof mockService.rejectProposal>) => mockService.rejectProposal(...args),
+  simulateEmergency: () => mockService.simulateEmergency(),
+  updateJobProgress: (...args: Parameters<typeof mockService.updateJobProgress>) => mockService.updateJobProgress(...args),
+  recordActivity: (event: Parameters<typeof mockService.recordActivity>[0]) => { void mockService.recordActivity(event); },
+  /** Throws synchronously when the server does not allow resets, matching the earlier behaviour. */
+  reset: () => {
+    if (!connectionStore.get().canReset) throw new Error('Reset is turned off on this server. Use local data to reset.');
+    void mockService.reset();
+  },
 };
 
-export function useHomeShieldState<T=DemoState>(selector:(state:DemoState)=>T=(state)=>state as T):T{const state=useSyncExternalStore(homeShieldService.subscribe,homeShieldService.getState,homeShieldService.getState);return selector(state)}
-export function useConnectionState(){return useSyncExternalStore(homeShieldService.subscribeConnection,homeShieldService.getConnection,homeShieldService.getConnection)}
-export function switchDataSource(mode:DataSourceMode){localStorage.setItem('homeshield.data-source.override',mode);window.location.reload()}
-export function useDemoState<T=DemoState>(selector:(state:DemoState)=>T=(state)=>state as T):T{return useHomeShieldState(selector)}
+export const useHomeShieldState = useDemoState;
+export const useConnectionState = () => useSyncExternalStore(connectionStore.subscribe, getConnection, getConnection);
 export type * from '../types/domain';

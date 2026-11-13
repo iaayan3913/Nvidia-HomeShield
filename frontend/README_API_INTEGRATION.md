@@ -1,5 +1,7 @@
 # FastAPI integration
 
+> **Superseded (round 2).** The separate `ApiHomeShieldService` described below has been replaced by the shared contract data service in `src/shared/mock` (HTTP + SSE through the `/api` dev proxy). `src/shared/data` remains as a thin compatibility layer over it. Use `VITE_DATA_MODE` / `VITE_BACKEND_URL` (not `VITE_DATA_SOURCE` / `VITE_API_URL`) and see the root README section "Run HomeShield on two devices".
+
 HomeShield has two explicit, isolated data sources. `mock` is the default and runs the complete fictional demonstration without FastAPI, network access, or NVIDIA services. `api` reads and writes the configured FastAPI service. Live failures never cause mock records to be mixed into an API session.
 
 ## Run locally
