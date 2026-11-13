@@ -15,7 +15,7 @@
 - [x] **[Person 1 | 10:25-10:35]** Set up GitHub deployment access and remote connections; done when the repo is reachable.
 - [x] **[Person 1 | 10:35-10:45]** Check installed Ollama models; done when exact names are recorded privately in `.env`.
 - [ ] **[Person 1 | 10:45-11:30]** Start Nano Omni or the best available vision model; done when Person 2 can call it.
-- [ ] **[Person 1 | 11:30-12:15]** Install/configure NemoClaw with OpenShell; done when one approved tool call succeeds.
+- [x] **[Person 1 | 11:30-12:15]** Install/configure NemoClaw with OpenShell; done when one approved tool call succeeds.
 - [x] **[Person 1 | 12:15 checkpoint]** If NemoClaw is not working after 45 minutes, switch to Python fallback; done when fallback is available.
 - [ ] **[Person 1 | 13:00 onward]** Keep servers running and prepare hosted fallback; done when the team can demo offline and hosted profiles.
 
