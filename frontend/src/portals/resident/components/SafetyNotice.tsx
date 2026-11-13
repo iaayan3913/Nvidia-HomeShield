@@ -16,7 +16,7 @@ export function SafetyPanel() {
       <div><dt>Someone in immediate danger, fire or a collapse</dt><dd><a className="rp-phone" href="tel:999">Call 999</a></dd></div>
       <div><dt>Smell gas or a carbon monoxide alarm is sounding (Great Britain)</dt><dd><a className="rp-phone" href="tel:08001119999">Call 0800 111 999</a></dd></div>
     </dl>
-    <p>HomeShield does not replace the emergency services. Reports are reviewed by people during working hours.</p>
+    <p>This service is for repairs. It does not replace the emergency services, so please call first if anyone is at risk.</p>
   </section>;
 }
 
