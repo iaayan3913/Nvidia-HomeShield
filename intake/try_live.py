@@ -14,10 +14,14 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # Windows consoles d
 
 print(f"Model {INTAKE_MODEL} at {LLM_BASE_URL}\n")
 for block in (DEMO / "reports.txt").read_text(encoding="utf-8").strip().split("\n\n"):
-    header, text = block.strip().split("\n", 1)
+    header, body = block.strip().split("\n", 1)
+    # Only the resident's words go to the model; an "Emergency: ..." answer line (and anything after it) is the expectation.
+    text, _, answer = body.partition("Emergency:")
+    text = " ".join(text.split())
     photo = DEMO / header.split()[0]
+    expected = " ".join(f"Emergency:{answer}".split()) if answer else header[len(photo.name):].strip()
     audio = next((p for ext in ("wav", "mp3") if (p := photo.with_suffix(f".{ext}")).is_file()), None)
-    print(f"{photo.name}{' + ' + audio.name if audio else ''}  {header[len(photo.name):].strip()}")
+    print(f"{photo.name}{' + ' + audio.name if audio else ''}\n  expected: {expected or '-'}")
     started = perf_counter()
     try:
         case = analyse_report(text, str(photo), str(audio) if audio else None)

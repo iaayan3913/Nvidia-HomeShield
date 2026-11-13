@@ -1,0 +1,22 @@
+preset:
+  name: homeshield-api
+  description: "HomeShield backend on the Spark (read cases, call agent tools; no self-approval)"
+network_policies:
+  homeshield-api:
+    name: homeshield-api
+    endpoints:
+      - host: 10.41.30.19
+        port: 8100
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/health" }
+          - allow: { method: GET, path: "/api/**" }
+          - allow: { method: POST, path: "/api/agent/tools/**" }
+    binaries:
+      - { path: /usr/bin/curl }
+      - { path: /usr/local/bin/curl }
+      - { path: /usr/bin/node }
+      - { path: /usr/local/bin/node }
+      - { path: /usr/bin/python3* }
+      - { path: /usr/local/bin/python3* }

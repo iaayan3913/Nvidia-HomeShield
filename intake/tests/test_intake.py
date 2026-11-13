@@ -91,3 +91,17 @@ def test_model_cannot_confirm_hhsrs_classification():
     # rules treat hhsrs_category as a professional classification, so the AI's guess must be ignored
     case = real.parse_case('{"hazard_type":"electrical","severity":"significant","hhsrs_category":"Electrical hazards"}', "r")
     assert case.hhsrs_category is None
+
+
+ASTHMA = "Black mould on the wall in my toddler's bedroom. She has asthma and her breathing is getting worse."
+
+def test_mould_with_asthma_is_emergency_in_mock(monkeypatch):
+    monkeypatch.setattr(agent, "INTAKE_ADAPTER", "mock")
+    case = agent.analyse_report(ASTHMA)
+    assert case.severity == Severity.emergency and case.is_emergency
+    assert case.vulnerable_occupants == ["child", "respiratory_condition"]
+
+def test_mould_with_respiratory_condition_is_emergency_from_model():
+    case = real.parse_case('{"hazard_type":"damp_mould","severity":"significant",'
+                           '"vulnerable_occupants":["child","respiratory_condition"]}', ASTHMA)
+    assert case.severity == Severity.emergency and case.is_emergency

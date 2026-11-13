@@ -69,6 +69,8 @@ def parse_case(raw: str, text: str, photo_uri: str | None = None, audio_uri: str
     if (fields.get("hazard_type") == "damp_mould" and fields.get("vulnerable_occupants")
             and fields.get("severity") in ("routine", "moderate")):
         fields["severity"] = "significant"  # the model wavers here; damp/mould with vulnerable occupants is a health risk
+    if fields.get("hazard_type") == "damp_mould" and "respiratory_condition" in (fields.get("vulnerable_occupants") or []):
+        fields["severity"] = "emergency"  # VERIFY: Awaab's Law guidance example - child's asthma worsened by bedroom mould
     try:
         return Case(id=f"case-{uuid4().hex[:8]}", **fields, summary=data.get("summary") or text[:1000],
                     is_emergency=fields.get("severity") == "emergency",
