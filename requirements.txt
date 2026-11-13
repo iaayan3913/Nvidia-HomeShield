@@ -7,4 +7,5 @@ openai
 pyyaml
 python-multipart
 pytest
-# Optional on the Spark: cuopt, ortools, osmnx
+ortools  # optional scheduler fallback; mock remains available when import fails
+# Optional on the Spark: cuopt, osmnx

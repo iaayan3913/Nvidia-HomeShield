@@ -45,13 +45,27 @@ class Store:
             );
             CREATE TABLE IF NOT EXISTS approvals (
                 id TEXT PRIMARY KEY, case_id TEXT NOT NULL, action TEXT NOT NULL,
-                status TEXT NOT NULL, payload TEXT NOT NULL, requested_at TEXT NOT NULL,
-                UNIQUE(case_id, action, status)
+                status TEXT NOT NULL, payload TEXT NOT NULL, requested_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS events_sequence_idx ON events(sequence);
             CREATE INDEX IF NOT EXISTS events_case_idx ON events(case_id);
             """
         )
+        approval_sql = self.connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='approvals'"
+        ).fetchone()[0]
+        if "UNIQUE(case_id, action, status)" in approval_sql:
+            self.connection.executescript(
+                """
+                ALTER TABLE approvals RENAME TO approvals_legacy;
+                CREATE TABLE approvals (
+                    id TEXT PRIMARY KEY, case_id TEXT NOT NULL, action TEXT NOT NULL,
+                    status TEXT NOT NULL, payload TEXT NOT NULL, requested_at TEXT NOT NULL
+                );
+                INSERT INTO approvals SELECT id,case_id,action,status,payload,requested_at FROM approvals_legacy;
+                DROP TABLE approvals_legacy;
+                """
+            )
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -135,6 +149,14 @@ class Store:
             row = self.connection.execute("SELECT payload FROM plans ORDER BY created_at DESC LIMIT 1").fetchone()
         return Plan.model_validate_json(row[0]) if row else None
 
+    def get_plan(self, plan_id: str) -> Plan | None:
+        with self.lock:
+            row = self.connection.execute("SELECT payload FROM plans WHERE id=?", (plan_id,)).fetchone()
+        return Plan.model_validate_json(row[0]) if row else None
+
+    def latest_active_plan(self) -> Plan | None:
+        return next((plan for plan in self.list_plans() if plan.approved), None)
+
     def list_plans(self) -> list[Plan]:
         with self.lock:
             rows = self.connection.execute("SELECT payload FROM plans ORDER BY created_at DESC").fetchall()
@@ -142,12 +164,14 @@ class Store:
 
     def request_approval(self, approval: Approval) -> Approval:
         with self.transaction() as db:
-            existing = db.execute(
-                "SELECT payload FROM approvals WHERE case_id=? AND action=? ORDER BY requested_at DESC LIMIT 1",
+            existing_rows = db.execute(
+                "SELECT payload FROM approvals WHERE case_id=? AND action=? ORDER BY requested_at DESC",
                 (approval.case_id, approval.action),
-            ).fetchone()
-            if existing:
-                return Approval.model_validate_json(existing[0])
+            ).fetchall()
+            for row in existing_rows:
+                existing = Approval.model_validate_json(row[0])
+                if existing.payload == approval.payload:
+                    return existing
             db.execute(
                 "INSERT INTO approvals(id,case_id,action,status,payload,requested_at) VALUES(?,?,?,?,?,?)",
                 (approval.id, approval.case_id, approval.action, approval.status.value,
