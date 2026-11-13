@@ -2,7 +2,7 @@
 
 | Role | Items | Done | % | Status |
 |---|---:|---:|---:|---|
-| Person 1 | 8 | 4 | 50% | done |
+| Person 1 | 8 | 4 | 50% | started |
 | Person 2 | 7 | 0 | 0% | not started |
 | Person 3 | 9 | 0 | 0% | not started |
 | Person 4 | 8 | 8 | 100% | done |
