@@ -14,5 +14,5 @@ def mock_case(text: str, photo_uri: str | None = None, property_id: str | None =
         hazard, severity = HazardType.damp_mould, Severity.significant
     evidence = [Evidence(kind=kind, uri=uri) for kind, uri in (("photo", photo_uri), ("audio", audio_uri)) if uri]
     return Case(id=f"case-{uuid4().hex[:8]}", hazard_type=hazard, severity=severity,
-                is_emergency=severity == Severity.emergency, summary=text or "Resident report",
+                is_emergency=severity == Severity.emergency, summary=text[:1000] or "Resident report",
                 evidence=evidence, property_id=property_id)

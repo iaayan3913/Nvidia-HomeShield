@@ -7,5 +7,5 @@ openai
 pyyaml
 python-multipart
 pytest
-ortools  # optional scheduler fallback; mock remains available when import fails
-# Optional on the Spark: cuopt, osmnx
+ortools  # scheduler fallback (pure-Python mock still works without it)
+# Optional: cuopt (Spark GPU, VERIFY aarch64), osmnx (real roads + travel matrix)
