@@ -23,7 +23,7 @@ Implement mock-first, then configure the endpoint from `.env`. Test mould, leak,
 
 ## Checklist
 
-Still open: one real request to Nano Omni (waiting on Person 1), then the 15:00 freeze decision.
+Still open: one real request to Nano Omni (waiting on Person 1) via `py -3.13 -m intake.try_live`, then the 15:00 freeze decision. Optional: a short test voice note (`demo-photos/socket.wav` or `.mp3`).
 
 - [x] `analyse_report()` accepts text, photo, and audio references. _Note: photo + audio via backend uploads; audio off until Person 1 confirms format._
 - [x] Mould, leak, and electrical fixtures parse. _Note: tested; demo photos in `demo-photos/`._
