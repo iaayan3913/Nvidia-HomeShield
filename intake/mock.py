@@ -1,7 +1,8 @@
 from backend.schemas import Case, Evidence, HazardType, Severity
 from uuid import uuid4
 
-def mock_case(text: str, photo_uri: str | None = None, property_id: str | None = None) -> Case:
+def mock_case(text: str, photo_uri: str | None = None, property_id: str | None = None,
+              audio_uri: str | None = None) -> Case:
     lower = text.lower()
     if "gas" in lower:
         hazard, severity = HazardType.gas, Severity.emergency
@@ -11,6 +12,7 @@ def mock_case(text: str, photo_uri: str | None = None, property_id: str | None =
         hazard, severity = HazardType.electrical, Severity.significant
     else:
         hazard, severity = HazardType.damp_mould, Severity.significant
+    evidence = [Evidence(kind=kind, uri=uri) for kind, uri in (("photo", photo_uri), ("audio", audio_uri)) if uri]
     return Case(id=f"case-{uuid4().hex[:8]}", hazard_type=hazard, severity=severity,
                 is_emergency=severity == Severity.emergency, summary=text or "Resident report",
-                evidence=[Evidence(kind="photo", uri=photo_uri)] if photo_uri else [], property_id=property_id)
+                evidence=evidence, property_id=property_id)
