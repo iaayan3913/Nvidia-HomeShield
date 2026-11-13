@@ -127,8 +127,12 @@ def test_real_adapter_receives_resolved_photo_and_skips_unconfirmed_audio(tmp_pa
     assert evidence["audio"]["uri"].startswith("upload://")
     assert "not analysed" in evidence["audio"]["description"]
     assert service.store.get_case("case-real-media") is not None
-    types = {event.type for _, event in service.store.list_events()}
+    events = [event for _, event in service.store.list_events()]
+    types = {event.type for event in events}
     assert "intake.media_unavailable" in types
+    completed = next(event for event in events if event.type == "intake.completed")
+    assert completed.payload["classification_status"] == "unknown_pending_professional_review"
+    assert completed.payload["hhsrs_category"] is None
 
 
 def test_real_audio_can_be_explicitly_enabled_and_failure_is_not_mocked(tmp_path):

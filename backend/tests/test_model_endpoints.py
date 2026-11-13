@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 import intake.real as real_intake
-from agent.orchestrator import NemoClawAgent, PythonToolAgent
+from agent.orchestrator import NemoClawAgent, PythonToolAgent, build_agent
 from backend.config import AGENT_BASE_URL, AGENT_MODEL, LLM_BASE_URL, NEMOCLAW_URL
 from backend.llm_client import AgentLLMClient, LLMClient, LLMError
 
@@ -95,6 +95,29 @@ def test_nemoclaw_url_remains_independent(monkeypatch):
     assert observed["url"] == "http://nemoclaw.internal:9000/runs"
     assert actions == [{"name": "get_case"}]
     assert NEMOCLAW_URL != AGENT_BASE_URL or not NEMOCLAW_URL
+
+
+def test_runtime_factory_selects_distinct_execution_paths():
+    executor = lambda *_: None
+    mock = build_agent(executor, runtime="mock")
+    python = build_agent(executor, runtime="python")
+    nemoclaw = build_agent(executor, runtime="nemoclaw")
+    assert isinstance(mock, PythonToolAgent) and mock.use_model is False
+    assert isinstance(python, PythonToolAgent) and python.use_model is True
+    assert isinstance(nemoclaw, NemoClawAgent) and nemoclaw.executor is executor
+
+
+def test_nemoclaw_actions_execute_only_through_validated_executor(monkeypatch):
+    class Response:
+        def raise_for_status(self): return None
+        def json(self):
+            return {"actions": [{"name": "get_case", "arguments": {"case_id": "wrong"}},
+                                {"name": "not_permitted", "arguments": {}}]}
+    monkeypatch.setattr("agent.orchestrator.httpx.post", lambda *args, **kwargs: Response())
+    executed = []
+    result = NemoClawAgent(base_url="http://nemoclaw", executor=lambda name, args: executed.append((name, args))).run("case-safe")
+    assert executed == [("get_case", {"case_id": "case-safe"})]
+    assert result == [{"tool": "get_case", "success": True, "summary": "Tool completed"}]
 
 
 def test_mock_agent_is_offline_and_unavailable_agent_is_clear():

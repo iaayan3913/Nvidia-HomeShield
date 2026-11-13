@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from backend.config import COMPONENT_TIMEOUT_SECONDS, INTAKE_MODEL, LLM_API_KEY, LLM_BASE_URL
 from backend.llm_client import LLMClient, LLMError
 from backend.schemas import Case, Evidence
+from .triage import apply_safety_triage
 
 class IntakeError(RuntimeError): pass
 
@@ -70,16 +71,14 @@ def parse_case(raw: str, text: str, photo_uri: str | None = None, audio_uri: str
     if (fields.get("hazard_type") == "damp_mould" and fields.get("vulnerable_occupants")
             and fields.get("severity") in ("routine", "moderate")):
         fields["severity"] = "significant"  # the model wavers here; damp/mould with vulnerable occupants is a health risk
-    if fields.get("hazard_type") == "damp_mould" and (
-            "respiratory_condition" in (fields.get("vulnerable_occupants") or []) or data.get("health_symptoms") is True):
-        # VERIFY: Awaab's Law Phase 2 triage guidance - damp/mould is an emergency where the tenant is particularly
-        # vulnerable or already has symptoms (worked example: young child's asthma affected by bedroom mould)
+    if fields.get("hazard_type") == "damp_mould" and data.get("health_symptoms") is True:
         fields["severity"] = "emergency"
     try:
-        return Case(id=f"case-{uuid4().hex[:8]}", **fields, summary=data.get("summary") or text[:1000],
+        case = Case(id=f"case-{uuid4().hex[:8]}", **fields, summary=data.get("summary") or text[:1000],
                     is_emergency=fields.get("severity") == "emergency",
                     evidence=[Evidence(kind=k, uri=u) for k, u in (("photo", photo_uri), ("audio", audio_uri)) if u],
                     property_id=property_id)
+        return apply_safety_triage(case, text)
     except ValidationError as exc:
         bad = ", ".join(".".join(map(str, e["loc"])) for e in exc.errors())
         raise IntakeError(f"Intake model JSON failed validation on: {bad}") from exc

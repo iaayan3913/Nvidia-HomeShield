@@ -52,13 +52,34 @@ class SchedulingService:
         self.clock = DemoClock()
         self.scheduler = scheduler or get_scheduler()
         rebase = self.clock.day if self.clock.real else None
+        self._seed_jobs = seed_jobs
+        self._worker_day = self.clock.day
         self.workers = load_workers(rebase)
         self.jobs: dict[str, Job] = {j.id: j for j in load_jobs(rebase)} if seed_jobs else {}
         self._lock = Lock()
         self._plan: Plan | None = None
         self.last_meta: dict = {}
 
+    def refresh_for_clock(self) -> datetime:
+        """Rebase shifts/seed jobs after a real or accelerated clock crosses a day.
+
+        A long-running process must not keep yesterday's one-day fixtures. Case
+        jobs are rebuilt by the backend from their stable creation timestamps.
+        """
+        now = self.clock.now()
+        day = now.date()
+        if day == self._worker_day:
+            return now
+        with self._lock:
+            if day != self._worker_day:
+                self.workers = load_workers(day)
+                self.jobs = {j.id: j for j in load_jobs(day)} if self._seed_jobs else {}
+                self._worker_day = day
+                self._plan = None
+        return now
+
     def current_plan(self) -> Plan:
+        self.refresh_for_clock()
         with self._lock:
             if self._plan is None:
                 self._plan = self.scheduler.optimise_schedule(self.workers, list(self.jobs.values()))
@@ -77,7 +98,7 @@ class SchedulingService:
         """Add (or update) a case's job and re-plan from now. Returns (plan, diff)."""
         self.resolve_property(case)
         before = self.current_plan()
-        now = self.clock.now()
+        now = self.refresh_for_clock()
         with self._lock:
             job = case_to_job(case, now=now)
             self.jobs[job.id] = job

@@ -4,9 +4,11 @@ from threading import RLock
 from uuid import uuid4
 
 from agent.rules import compute_deadlines
+from agent.orchestrator import AgentBackend, build_agent
+from agent.tools import TOOL_NAMES
 from backend.config import (
-    DATABASE_PATH, INTAKE_ADAPTER, INTAKE_AUDIO_ENABLED, SCHEDULER_ADAPTER,
-    SCHEDULER_SEED_JOBS, SCHEDULER_TIME_LIMIT_S,
+    AGENT_RUNTIME, DATABASE_PATH, INTAKE_ADAPTER, INTAKE_AUDIO_ENABLED, SCHEDULER_ADAPTER,
+    SCHEDULER_ALLOW_FALLBACK, SCHEDULER_SEED_JOBS, SCHEDULER_TIME_LIMIT_S,
 )
 from backend.schemas import (
     AgentEvent, Approval, ApprovalStatus, Case, CasePatch, CaseStatus, DecisionIn, Evidence,
@@ -29,22 +31,33 @@ class HomeShieldService:
                  intake_adapter: str = INTAKE_ADAPTER, upload_store: UploadStore | None = None,
                  intake_audio_enabled: bool = INTAKE_AUDIO_ENABLED,
                  scheduler_adapter: str = SCHEDULER_ADAPTER,
-                 scheduler_seed_jobs: bool = SCHEDULER_SEED_JOBS):
+                 scheduler_seed_jobs: bool = SCHEDULER_SEED_JOBS,
+                 agent_runtime: str = AGENT_RUNTIME, agent_backend: AgentBackend | None = None):
         self.store = store or Store(DATABASE_PATH)
         self.scheduler_adapter = scheduler_adapter
-        self.scheduler = scheduler or get_scheduler(scheduler_adapter, SCHEDULER_TIME_LIMIT_S)
+        self.scheduler = scheduler or get_scheduler(scheduler_adapter, SCHEDULER_TIME_LIMIT_S,
+                                                     SCHEDULER_ALLOW_FALLBACK)
         self.scheduling = SchedulingService(scheduler=self.scheduler, seed_jobs=scheduler_seed_jobs)
         self.intake = intake or analyse_report
         self.intake_adapter = intake_adapter
         self.upload_store = upload_store or UploadStore()
         self.intake_audio_enabled = intake_audio_enabled
         self._decision_lock = RLock()
+        self._agent_lock = RLock()
+        self._agent_plans: dict[str, Plan] = {}
+        self._agent_approvals: dict[str, Approval] = {}
+        self.agent_runtime = agent_runtime.lower()
+        self.agent = agent_backend or build_agent(self.execute_agent_tool, runtime=self.agent_runtime)
 
     def scheduler_status(self) -> dict:
+        from scheduler.cuopt import status as cuopt_status
         chain = getattr(self.scheduler, "chain", [self.scheduler])
         return {"requested": self.scheduler_adapter,
                 "chain": [getattr(item, "name", type(item).__name__) for item in chain],
-                "time_limit_s": SCHEDULER_TIME_LIMIT_S}
+                "time_limit_s": SCHEDULER_TIME_LIMIT_S,
+                "allow_fallback": getattr(self.scheduler, "allow_fallback", SCHEDULER_ALLOW_FALLBACK),
+                "cuopt": cuopt_status(),
+                "unavailable": getattr(self.scheduler, "initial_failures", [])}
 
     def emit(self, event_type: str, summary: str, case_id: str | None = None,
              *, tool_name: str | None = None, payload: dict | None = None,
@@ -85,7 +98,10 @@ class HomeShieldService:
                       payload={"adapter": self.intake_adapter,
                                "photo": "submitted" if photo and self.intake_adapter == "real" else
                                         "stored_mock_only" if photo else "not_provided",
-                               "audio": audio_status})
+                               "audio": audio_status,
+                               "hhsrs_category": case.hhsrs_category,
+                               "classification_status": "professionally_confirmed" if case.hhsrs_category
+                                                        else "unknown_pending_professional_review"})
             if audio_status in {"stored_not_analysed", "stored_audio_rejected_by_adapter"}:
                 self.emit("intake.media_unavailable", "Audio was stored but not analysed", case.id,
                           payload={"media": "audio", "status": audio_status}, success=False)
@@ -107,12 +123,85 @@ class HomeShieldService:
         self.emit(deadline_event, "Deadline policy evaluated", case.id,
                   payload={"verified": case.deadlines.verified, "phase": case.deadlines.policy_phase})
 
-        plan = self.propose_plan(case.id, emergency=force_emergency or case.is_emergency)
-        approval = self.request_approval(case.id, "commit_plan", {"plan_id": plan.id} if plan else {})
+        plan, approval = self.coordinate_case(case.id)
         if force_emergency or case.is_emergency:
             self.emit("emergency.created", "Potential emergency requires immediate human safety review", case.id,
                       payload={"safety_notice": "Review immediately; HomeShield has not contacted emergency services"})
         return case, plan, approval
+
+    def coordinate_case(self, case_id: str) -> tuple[Plan | None, Approval]:
+        """Run the configured bounded orchestrator after the case is safely stored."""
+        self.emit("agent.run_started", "Configured agent coordination started", case_id,
+                  payload={"runtime": self.agent_runtime})
+        try:
+            results = self.agent.run(case_id)
+        except Exception as exc:
+            results = [{"tool": "agent_runtime", "success": False,
+                        "summary": f"Agent runtime failed ({type(exc).__name__})"}]
+        for result in results:
+            self.emit("agent.action_result", str(result.get("summary") or "Agent action completed"), case_id,
+                      tool_name=str(result.get("tool") or "agent_runtime"),
+                      payload={"runtime": self.agent_runtime}, success=bool(result.get("success")))
+        with self._agent_lock:
+            plan = self._agent_plans.pop(case_id, None)
+            approval = self._agent_approvals.pop(case_id, None)
+        if approval is None:
+            action = "commit_plan" if plan else "retry_schedule"
+            approval = self.request_approval(case_id, action, {"plan_id": plan.id} if plan else {
+                "reason": "Agent or scheduler did not produce a proposal"
+            })
+        self.emit("agent.run_completed", "Agent coordination completed with human review preserved", case_id,
+                  payload={"runtime": self.agent_runtime, "plan_id": getattr(plan, "id", None),
+                           "approval_id": approval.id}, success=plan is not None)
+        return plan, approval
+
+    def execute_agent_tool(self, tool_name: str, arguments: dict) -> object:
+        """Validated in-process tool interface shared by all configured agents."""
+        if tool_name not in TOOL_NAMES:
+            raise ValueError("unknown agent tool")
+        case_id = str(arguments.get("case_id") or "")
+        if tool_name == "create_case":
+            created = Case.model_validate(arguments.get("case"))
+            self.store.save_case(created, "Created by validated agent tool")
+            return created
+        if not case_id:
+            raise ValueError("case_id is required")
+        if tool_name == "get_case":
+            return self.require_case(case_id)
+        if tool_name == "get_repair_history":
+            self.require_case(case_id)
+            return self.store.case_history(case_id)
+        if tool_name == "compute_deadlines":
+            case = self.require_case(case_id)
+            case.deadlines = compute_deadlines(case, now=case.created_at)
+            self.store.save_case(case, "Compliance deadlines recalculated by agent tool")
+            self.emit("agent.tool_completed", "Deadline tool completed", case_id,
+                      tool_name=tool_name, success=True)
+            return case.deadlines
+        if tool_name == "schedule_job":
+            case = self.require_case(case_id)
+            plan = self.propose_plan(case_id, emergency=case.is_emergency)
+            with self._agent_lock:
+                self._agent_plans[case_id] = plan
+            return plan
+        if tool_name in {"request_approval", "notify_resident", "escalate"}:
+            self.require_case(case_id)
+            action = str(arguments.get("action") or tool_name)
+            payload = {key: value for key, value in arguments.items() if key not in {"case_id", "action"}}
+            with self._agent_lock:
+                plan = self._agent_plans.get(case_id)
+            if action in {"commit_plan", "schedule_job"}:
+                if plan:
+                    payload["plan_id"] = plan.id
+                    action = "commit_plan"
+                else:
+                    action = "retry_schedule"
+                    payload["reason"] = "No valid schedule proposal is available"
+            approval = self.request_approval(case_id, action, payload)
+            with self._agent_lock:
+                self._agent_approvals[case_id] = approval
+            return approval
+        raise ValueError("unsupported agent tool")
 
     def _stored_media(self, reference: str | None, kind: str) -> StoredUpload | None:
         if not reference:
@@ -139,8 +228,8 @@ class HomeShieldService:
                 case.evidence.append(Evidence(kind=media.kind, uri=media.reference, description=description))
 
     def _jobs_for_proposal(self) -> list:
+        self.scheduling.refresh_for_clock()
         jobs = dict(self.scheduling.jobs)
-        now = self.scheduling.clock.now()
         for case in self.store.list_cases():
             if case.status == CaseStatus.resolved:
                 continue
@@ -148,7 +237,10 @@ class HomeShieldService:
             self.scheduling.resolve_property(case)
             if case.property_id != previous_property:
                 self.store.save_case(case, "Scheduler assigned a synthetic demo property")
-            job = case_to_job(case, now=now)
+            # A case's scheduling window begins when the landlord became aware of
+            # it. Rebuilding old jobs with the current clock invalidated active
+            # ETAs and was the long-running-process 503 root cause.
+            job = case_to_job(case, now=case.created_at)
             jobs[job.id] = job
         return list(jobs.values())
 
@@ -158,9 +250,14 @@ class HomeShieldService:
             self.emit("plan.replan_started", "Emergency schedule re-planning started", case_id,
                       payload={"active_plan_id": getattr(self.store.latest_active_plan(), "id", None)})
         try:
+            now = self.scheduling.refresh_for_clock()
             active = self.store.latest_active_plan()
+            active_days = {stop.eta.date() for route in active.workers for stop in route.stops} if active else set()
+            if active and active_days and active_days != {now.date()}:
+                self.emit("plan.recovery_started", "Previous-day active plan was not warm-started", case_id,
+                          payload={"active_plan_id": active.id, "operational_day": now.date().isoformat()})
+                active = None
             jobs = self._jobs_for_proposal()
-            now = self.scheduling.clock.now()
             if active:
                 plan = self.scheduler.replan(active, self.scheduling.workers, jobs, now)
             else:
@@ -191,9 +288,12 @@ class HomeShieldService:
             return plan
         except Exception as exc:
             self.emit("plan.failed", "Scheduling failed", case_id, success=False,
-                      payload={"error_type": type(exc).__name__, "requested_adapter": self.scheduler_adapter})
+                      payload={"error_type": type(exc).__name__, "error": str(exc)[:500],
+                               "requested_adapter": self.scheduler_adapter,
+                               "recoverable": True})
             self.emit("agent.tool_failed", "Scheduling tool failed", case_id, tool_name="schedule_job", success=False,
-                      payload={"error_type": type(exc).__name__})
+                      payload={"error_type": type(exc).__name__, "error": str(exc)[:500],
+                               "recoverable": True})
             raise RuntimeError("scheduler could not produce a plan") from exc
 
     def request_approval(self, case_id: str, action: str, payload: dict | None = None) -> Approval:
@@ -247,6 +347,10 @@ class HomeShieldService:
             self.store.save_case(case, "Schedule approved")
             self.emit("case.status_changed", "Case schedule approved", case.id,
                       payload={"status": case.status.value})
+        elif approval.action == "retry_schedule":
+            plan = self.propose_plan(case.id, emergency=case.is_emergency)
+            follow_up = self.request_approval(case.id, "commit_plan", {"plan_id": plan.id})
+            approval.outcome = f"Scheduling retried; proposal {plan.id} awaits approval {follow_up.id}"
         elif approval.action == "escalate":
             case.status = CaseStatus.escalated
             self.store.save_case(case, "Escalation approved")

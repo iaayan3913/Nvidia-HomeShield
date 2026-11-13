@@ -10,6 +10,7 @@ from data.generate_synthetic import generate_jobs, generate_workers
 from data.sheffield import FIXTURE_DAY, is_plausible_residential
 from scheduler import FallbackScheduler, diff_plans, get_scheduler, validate_plan
 from scheduler import ortools as ortools_mod
+from scheduler import cuopt as cuopt_mod
 from scheduler.core import BaseScheduler
 from scheduler.fixtures import case_to_job, demo_emergency_job, load_jobs, load_workers
 from scheduler.mock import MockScheduler
@@ -114,6 +115,17 @@ def test_fallback_chain_survives_a_broken_solver(workers, jobs):
 def test_get_scheduler_always_ends_in_mock():
     assert get_scheduler("mock").chain[-1].name == "mock"
     assert get_scheduler().chain[-1].name == "mock"
+
+
+def test_explicit_cuopt_reports_unavailability_and_can_disable_fallback(monkeypatch):
+    monkeypatch.setattr(cuopt_mod, "available", lambda: False)
+    monkeypatch.setattr(cuopt_mod, "status", lambda: "cuopt unavailable: ImportError: test")
+    fallback = get_scheduler("cuopt", allow_fallback=True)
+    assert fallback.chain and fallback.initial_failures == ["cuopt unavailable: ImportError: test"]
+    strict = get_scheduler("cuopt", allow_fallback=False)
+    assert strict.chain == []
+    with pytest.raises(RuntimeError, match="cuopt unavailable: ImportError: test"):
+        strict.optimise_schedule([], [])
 
 
 def test_case_to_job_for_emergency():

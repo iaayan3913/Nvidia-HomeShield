@@ -122,6 +122,45 @@ def test_unassigned_jobs_and_scheduler_failures_are_explicit(tmp_path):
     broken = integration_service(tmp_path / "broken", scheduler=BrokenScheduler(), adapter="broken")
     broken_client = TestClient(create_app(broken))
     failed = broken_client.post("/api/reports", json={"text": "mould"})
-    assert failed.status_code == 503
-    assert "scheduler could not produce a plan" in failed.json()["detail"]
-    assert "plan.failed" in {event["type"] for event in broken_client.get("/api/events").json()}
+    assert failed.status_code == 201
+    body = failed.json()
+    assert body["case"]["id"] and body["plan"] is None
+    assert body["approval"]["action"] == "retry_schedule"
+    assert broken.store.get_case(body["case"]["id"]) is not None
+    events = broken_client.get("/api/events").json()
+    failure = next(event for event in events if event["type"] == "plan.failed")
+    assert failure["payload"]["recoverable"] is True
+    assert failure["payload"]["error_type"] == "TimeoutError"
+
+
+@pytest.mark.parametrize("adapter", ["mock", "ortools"])
+def test_repeated_reports_approvals_and_next_day_emergency_without_restart(tmp_path, adapter):
+    if adapter == "ortools" and not ortools_module.available():
+        pytest.skip("OR-Tools is not installed")
+    current = [datetime(2026, 11, 13, 10, tzinfo=timezone.utc)]
+
+    def timed_intake(text, photo_uri=None, audio_uri=None, property_id=None):
+        return Case(id=f"case-{uuid4().hex[:8]}", hazard_type=HazardType.damp_mould,
+                    severity=Severity.significant, is_emergency=False, summary=text,
+                    property_id=property_id or "p-001", created_at=current[0])
+
+    service = HomeShieldService(Store(str(tmp_path / "long-running.sqlite3")),
+                                get_scheduler(adapter, 0.2), intake=timed_intake,
+                                intake_adapter="mock", scheduler_adapter=adapter,
+                                scheduler_seed_jobs=False)
+    service.scheduling.clock.now = lambda: current[0].replace(tzinfo=None)
+    client = TestClient(create_app(service))
+    for hour in (10, 13, 16):
+        current[0] = datetime(2026, 11, 13, hour, tzinfo=timezone.utc)
+        created = client.post("/api/reports", json={"text": f"mould report {hour}", "property_id": "p-001"})
+        assert created.status_code == 201 and created.json()["plan"] is not None
+        approval = created.json()["approval"]["id"]
+        assert client.post(f"/api/approvals/{approval}/approve", json={"decided_by": "officer"}).status_code == 200
+
+    current[0] = datetime(2026, 11, 14, 9, tzinfo=timezone.utc)
+    emergency = client.post("/api/emergency", json={"text": "gas smell", "property_id": "p-110"})
+    assert emergency.status_code == 201 and emergency.json()["case"]["is_emergency"] is True
+    assert emergency.json()["plan"] is not None
+    final = client.post("/api/reports", json={"text": "another mould report", "property_id": "p-002"})
+    assert final.status_code == 201 and final.json()["case"]["id"]
+    assert "plan.recovery_started" in {event["type"] for event in client.get("/api/events").json()}

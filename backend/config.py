@@ -21,9 +21,13 @@ UPLOAD_DIRECTORY = os.getenv("UPLOAD_DIRECTORY", str(BASE_DIR / "data" / "upload
 MAX_PHOTO_UPLOAD_BYTES = int(os.getenv("MAX_PHOTO_UPLOAD_BYTES", str(10 * 1024 * 1024)))
 MAX_AUDIO_UPLOAD_BYTES = int(os.getenv("MAX_AUDIO_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 INTAKE_AUDIO_ENABLED = env_bool("INTAKE_AUDIO_ENABLED", False)
-SCHEDULER_ADAPTER = os.getenv("SCHEDULER_ADAPTER", "mock" if USE_MOCKS else "ortools").lower()
+# SCHEDULER is the original Person 4/Spark variable; SCHEDULER_ADAPTER is the
+# canonical backend name. Honour both so existing Spark profiles do not
+# silently fall back to mock/OR-Tools.
+SCHEDULER_ADAPTER = os.getenv("SCHEDULER_ADAPTER", os.getenv("SCHEDULER", "mock" if USE_MOCKS else "ortools")).lower()
 SCHEDULER_TIME_LIMIT_S = float(os.getenv("SCHEDULER_TIME_LIMIT_S", "1.0"))
 SCHEDULER_SEED_JOBS = env_bool("SCHEDULER_SEED_JOBS", True)
+SCHEDULER_ALLOW_FALLBACK = env_bool("SCHEDULER_ALLOW_FALLBACK", True)
 # Nano Omni intake endpoint. Kept under the established names for Person 2 compatibility.
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://127.0.0.1:18000/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")

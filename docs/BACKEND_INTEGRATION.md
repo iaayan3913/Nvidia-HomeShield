@@ -27,7 +27,8 @@ forward both model ports in one SSH command while leaving local 8001 for its own
 - The tested fallback is `AGENT_RUNTIME=mock`; `NemoClawAgent` is an untested HTTP seam until the
   runtime contract and sandbox permissions are supplied.
 - For the Python fallback use `AGENT_RUNTIME=python`; it calls the Lightning endpoint for a bounded
-  JSON tool selection and never exposes model reasoning. `AGENT_RUNTIME=mock` stays fully offline.
+  JSON tool selection and never exposes model reasoning. The configured orchestrator now runs in the
+  report and emergency call path after the case is safely persisted. `AGENT_RUNTIME=mock` stays fully offline.
 
 ## Person 2: intake
 
@@ -45,7 +46,12 @@ forward both model ports in one SSH command while leaving local 8001 for its own
 
 - Person 4's solver core is integrated. Select `SCHEDULER_ADAPTER=mock`, `ortools`, `cuopt`, or
   `auto`; set `SCHEDULER_TIME_LIMIT_S` for solver limits and `SCHEDULER_SEED_JOBS=true` to include
-  the 8-worker/36-job offline fixture. Explicit adapters still end in the labelled mock fallback.
+  the 8-worker/36-job offline fixture. With fallback enabled, explicit adapters still end in the
+  labelled mock fallback.
+- `SCHEDULER_ALLOW_FALLBACK=false` makes an explicit `cuopt`/`ortools` request strict for Spark
+  verification. Leave it `true` for the resilient demo. `/health.scheduler` reports the requested
+  adapter, actual chain, cuOpt import error (if any), and whether fallback is permitted. The legacy
+  `SCHEDULER` variable remains supported, but `SCHEDULER_ADAPTER` takes precedence.
 - Inputs are validated `Worker` and `Job` objects. Case-to-job conversion uses the property stock,
   required skill, duration, compliance/appointment window and priority. Outputs are shared `Plan`
   objects with measured `solver_ms`, ordered stops/ETAs/coordinates/slack, unassigned jobs and
@@ -59,6 +65,10 @@ forward both model ports in one SSH command while leaving local 8001 for its own
   `plan.activated`; rejection leaves the prior active plan unchanged.
 - OR-Tools 9.15 is tested on Windows. cuOpt remains an availability-checked adapter and must be
   verified on DGX Spark with `python3 -m scheduler.cuopt`; no local cuOpt execution is claimed.
+- A scheduler failure no longer loses the case or turns the report into a 503. The response contains
+  `plan: null` and a pending `retry_schedule` approval; `plan.failed` records a safe error type/message
+  and `recoverable=true`. Approving the retry can create a new proposal, which still requires a
+  separate human approval before activation.
 
 ## Person 5: frontend
 
@@ -84,3 +94,8 @@ work in one process, but production multi-worker fan-out needs a shared broker s
 Uploads are private files under `UPLOAD_DIRECTORY` (default `data/uploads/`) and are never mounted
 as a public static directory. SQLite stores only the opaque reference, MIME type/size description,
 and processing status.
+
+`hhsrs_category` remains null for model-only intake, including photo/audio reports, by design:
+an AI suggestion is not a competent-person HHSRS classification. `intake.completed` exposes
+`classification_status=unknown_pending_professional_review`, and deadline records keep
+`review_required=true` until a professional category is supplied.

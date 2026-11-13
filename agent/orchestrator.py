@@ -98,6 +98,8 @@ class NemoClawAgent:
 
     base_url: str = NEMOCLAW_URL
     timeout_seconds: float = COMPONENT_TIMEOUT_SECONDS
+    executor: Callable[[str, dict], object] | None = None
+    max_iterations: int = AGENT_MAX_ITERATIONS
 
     def run(self, case_id: str) -> list[dict]:
         if not self.base_url:
@@ -110,10 +112,33 @@ class NemoClawAgent:
         )
         response.raise_for_status()
         value = response.json()
-        return value.get("actions", []) if isinstance(value, dict) else []
+        raw_actions = value.get("actions", []) if isinstance(value, dict) else []
+        actions = []
+        for item in raw_actions[:self.max_iterations] if isinstance(raw_actions, list) else []:
+            if not isinstance(item, dict) or item.get("name") not in TOOL_NAMES:
+                continue
+            arguments = item.get("arguments") if isinstance(item.get("arguments"), dict) else {}
+            arguments["case_id"] = case_id
+            actions.append({"name": item["name"], "arguments": arguments})
+        if self.executor is None:
+            return raw_actions[:self.max_iterations] if isinstance(raw_actions, list) else []
+        results = []
+        for item in actions:
+            try:
+                self.executor(item["name"], item["arguments"])
+                results.append({"tool": item["name"], "success": True, "summary": "Tool completed"})
+            except Exception as exc:
+                results.append({"tool": item["name"], "success": False,
+                                "summary": f"Tool failed ({type(exc).__name__})"})
+        return results
 
 
-def build_agent(executor: Callable[[str, dict], object]) -> AgentBackend:
-    if AGENT_RUNTIME == "nemoclaw":
-        return NemoClawAgent()
-    return PythonToolAgent(executor=executor, use_model=AGENT_RUNTIME == "python" and not USE_MOCKS)
+def build_agent(executor: Callable[[str, dict], object], *, runtime: str | None = None,
+                use_mocks: bool | None = None) -> AgentBackend:
+    selected = (runtime or AGENT_RUNTIME).lower()
+    _ = USE_MOCKS if use_mocks is None else use_mocks  # retained for call-site compatibility
+    if selected == "nemoclaw":
+        return NemoClawAgent(executor=executor)
+    if selected not in {"mock", "python"}:
+        raise ValueError(f"unknown agent runtime: {selected}")
+    return PythonToolAgent(executor=executor, use_model=selected == "python")

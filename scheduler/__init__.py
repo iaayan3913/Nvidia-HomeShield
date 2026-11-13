@@ -22,9 +22,13 @@ __all__ = ["Scheduler", "FallbackScheduler", "get_scheduler", "diff_plans", "val
 
 
 class FallbackScheduler:
-    def __init__(self, chain: list[BaseScheduler]):
+    def __init__(self, chain: list[BaseScheduler], *, initial_failures: list[str] | None = None,
+                 requested: str = "auto", allow_fallback: bool = True):
         self.chain = chain
-        self.last_meta: dict = {}
+        self.initial_failures = list(initial_failures or [])
+        self.requested = requested
+        self.allow_fallback = allow_fallback
+        self.last_meta: dict = {"requested": requested, "fallback_from": self.initial_failures}
 
     @property
     def name(self) -> str:
@@ -32,7 +36,7 @@ class FallbackScheduler:
 
     def optimise_schedule(self, workers: list[Worker], jobs: list[Job],
                           initial_routes: dict[str, list[str]] | None = None) -> Plan:
-        failures = []
+        failures = list(self.initial_failures)
         for solver in self.chain:
             try:
                 plan = solver.optimise_schedule(workers, jobs, initial_routes=initial_routes)
@@ -55,16 +59,29 @@ def _time_limit() -> float:
         return 1.0
 
 
-def get_scheduler(name: str | None = None, time_limit_s: float | None = None) -> FallbackScheduler:
+def get_scheduler(name: str | None = None, time_limit_s: float | None = None,
+                  allow_fallback: bool | None = None) -> FallbackScheduler:
     from . import cuopt, ortools
     from .mock import MockScheduler
 
     name = (name or os.getenv("SCHEDULER", "auto")).lower()
+    if name not in {"auto", "cuopt", "ortools", "mock"}:
+        raise ValueError(f"unknown scheduler adapter: {name}")
     limit = _time_limit() if time_limit_s is None else time_limit_s
+    if allow_fallback is None:
+        allow_fallback = os.getenv("SCHEDULER_ALLOW_FALLBACK", "true").strip().lower() in {"1", "true", "yes", "on"}
     chain: list[BaseScheduler] = []
-    if name in ("auto", "cuopt") and cuopt.available():
-        chain.append(cuopt.CuOptScheduler(time_limit_s=limit))
-    if name in ("auto", "cuopt", "ortools") and ortools.available():
-        chain.append(ortools.OrToolsScheduler(time_limit_s=limit))
-    chain.append(MockScheduler(time_limit_s=limit))
-    return FallbackScheduler(chain)
+    failures: list[str] = []
+    if name in ("auto", "cuopt"):
+        if cuopt.available():
+            chain.append(cuopt.CuOptScheduler(time_limit_s=limit))
+        else:
+            failures.append(cuopt.status())
+    if name in ("auto", "ortools") or (name == "cuopt" and allow_fallback):
+        if ortools.available():
+            chain.append(ortools.OrToolsScheduler(time_limit_s=limit))
+        else:
+            failures.append("ortools unavailable: import failed")
+    if name == "mock" or name == "auto" or allow_fallback:
+        chain.append(MockScheduler(time_limit_s=limit))
+    return FallbackScheduler(chain, initial_failures=failures, requested=name, allow_fallback=allow_fallback)

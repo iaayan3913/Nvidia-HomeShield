@@ -11,10 +11,9 @@ from pydantic import ValidationError
 from starlette.datastructures import UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from agent.rules import compute_deadlines
 from agent.tools import TOOL_NAMES, TOOLS
-from backend.config import AGENT_RUNTIME, CORS_ORIGINS, DEMO_SEED, SCHEDULER_ADAPTER, USE_MOCKS
-from backend.schemas import ApprovalIn, Case, CasePatch, DecisionIn, EmergencyIn, ReportIn, StatusIn
+from backend.config import CORS_ORIGINS, DEMO_SEED, USE_MOCKS
+from backend.schemas import ApprovalIn, CasePatch, DecisionIn, EmergencyIn, ReportIn, StatusIn
 from backend.service import HomeShieldService
 from backend.uploads import UploadValidationError
 
@@ -36,7 +35,7 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
     @api.get("/health")
     def health():
         return {"status": "ok", "mocks": USE_MOCKS, "database": "sqlite",
-                "scheduler": backend.scheduler_status(), "agent_runtime": AGENT_RUNTIME}
+                "scheduler": backend.scheduler_status(), "agent_runtime": backend.agent_runtime}
 
     async def report_response(report: ReportIn):
         try:
@@ -227,30 +226,11 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
         try:
             backend.emit("agent.tool_requested", "Agent tool requested", str(case_id) if case_id else None,
                          tool_name=tool_name)
-            if tool_name == "create_case":
-                created = Case.model_validate(arguments.get("case"))
-                backend.store.save_case(created, "Created by approved agent tool")
-                backend.emit("agent.tool_completed", "Case creation tool completed", created.id,
-                             tool_name=tool_name, success=True)
-                return created
-            if tool_name == "get_case":
-                return backend.require_case(str(case_id))
-            if tool_name == "get_repair_history":
-                backend.require_case(str(case_id))
-                return backend.store.case_history(str(case_id))
-            if tool_name == "compute_deadlines":
-                case = backend.require_case(str(case_id))
-                result = compute_deadlines(case)
-                backend.emit("agent.tool_completed", "Deadline tool completed", case.id,
-                             tool_name=tool_name, success=True)
-                return result
-            if tool_name == "schedule_job":
-                return backend.propose_plan(str(case_id))
-            if tool_name in {"request_approval", "notify_resident", "escalate"}:
-                backend.require_case(str(case_id))
-                action = arguments.get("action") or tool_name
-                payload = {key: value for key, value in arguments.items() if key != "case_id"}
-                return backend.request_approval(str(case_id), str(action), payload)
+            result = backend.execute_agent_tool(tool_name, arguments)
+            backend.emit("agent.tool_completed", "Validated agent tool completed",
+                         str(case_id) if case_id else getattr(result, "id", None),
+                         tool_name=tool_name, success=True)
+            return result
         except KeyError as exc:
             backend.emit("agent.tool_failed", "Agent tool target was not found", str(case_id),
                          tool_name=tool_name, success=False)

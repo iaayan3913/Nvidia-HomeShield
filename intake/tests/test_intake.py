@@ -107,6 +107,14 @@ def test_mould_with_respiratory_condition_is_emergency_from_model():
     assert case.severity == Severity.emergency and case.is_emergency
 
 
+def test_report_text_guardrail_catches_asthma_when_model_omits_vulnerability():
+    case = real.parse_case('{"hazard_type":"damp_mould","severity":"moderate",'
+                           '"vulnerable_occupants":[],"health_symptoms":false}', ASTHMA)
+    assert case.severity == Severity.emergency and case.is_emergency
+    assert case.vulnerable_occupants == ["child", "respiratory_condition"]
+    assert case.hhsrs_category is None
+
+
 COUGH = "Black mould on my son's bedroom wall. He's 3 and has been coughing at night for two weeks."
 
 def test_mould_with_symptoms_is_emergency(monkeypatch):
@@ -117,3 +125,31 @@ def test_mould_with_symptoms_is_emergency(monkeypatch):
     # child but no symptoms or condition stays significant (guidance's non-emergency contrast)
     assert not real.parse_case('{"hazard_type":"damp_mould","severity":"significant","vulnerable_occupants":["child"],'
                                '"health_symptoms":false}', "r").is_emergency
+
+
+@pytest.mark.parametrize("text,expected_hazard,expected_severity,emergency", [
+    ("Minor small patch of mould in an adult's hallway, no symptoms.", "damp_mould", "moderate", False),
+    ("Severe widespread mould throughout the bedroom, no health symptoms reported.", "damp_mould", "significant", False),
+    ("Mould across the bedroom wall; I have no information about who sleeps there.", "damp_mould", "significant", False),
+    ("There is a strong smell of gas in the kitchen.", "gas", "emergency", True),
+    ("Exposed live wiring is sparking beside the socket.", "electrical", "emergency", True),
+])
+def test_deterministic_safety_guardrails(monkeypatch, text, expected_hazard, expected_severity, emergency):
+    monkeypatch.setattr(agent, "INTAKE_ADAPTER", "mock")
+    case = agent.analyse_report(text)
+    assert case.hazard_type.value == expected_hazard
+    assert case.severity.value == expected_severity
+    assert case.is_emergency is emergency
+    assert case.hhsrs_category is None
+
+
+@pytest.mark.parametrize("photo,audio", [(None, None), ("upload://p.jpg", None),
+                                           (None, "upload://a.wav"),
+                                           ("upload://p.jpg", "upload://a.wav")])
+def test_media_combinations_preserve_explicit_unknown_hhsrs_review(photo, audio):
+    case = real.parse_case('{"hazard_type":"damp_mould","severity":"significant",'
+                           '"vulnerable_occupants":[],"summary":"Mould requires inspection"}',
+                           "Mould requires inspection", photo, audio)
+    assert case.hhsrs_category is None
+    expected = [kind for kind, value in (("photo", photo), ("audio", audio)) if value]
+    assert [item.kind for item in case.evidence] == expected

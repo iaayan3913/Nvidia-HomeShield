@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
+import pytest
 
 from agent.orchestrator import PythonToolAgent
 from agent.rules import add_working_days, compute_deadlines
@@ -20,6 +21,27 @@ def test_health_docs_and_invalid_report(tmp_path):
     assert client.get("/health").status_code == 200
     assert client.get("/docs").status_code == 200
     assert client.post("/api/reports", json={"text": "  "}).status_code == 422
+
+
+@pytest.mark.parametrize("runtime", ["mock", "python", "nemoclaw"])
+def test_service_enters_configured_agent_runtime_and_preserves_case_on_failure(tmp_path, runtime):
+    calls = []
+
+    class RecordingAgent:
+        def run(self, case_id):
+            calls.append(case_id)
+            return [{"tool": "agent_runtime", "success": False, "summary": "test runtime unavailable"}]
+
+    service = HomeShieldService(Store(str(tmp_path / f"{runtime}.sqlite3")), MockScheduler(),
+                                agent_runtime=runtime, agent_backend=RecordingAgent())
+    client = TestClient(create_app(service))
+    response = client.post("/api/reports", json={"text": "Mould requires inspection", "property_id": "p-001"})
+    assert response.status_code == 201
+    body = response.json()
+    assert calls == [body["case"]["id"]]
+    assert body["plan"] is None and body["approval"]["action"] == "retry_schedule"
+    assert service.store.get_case(body["case"]["id"]) is not None
+    assert client.get("/health").json()["agent_runtime"] == runtime
 
 
 def test_report_case_retrieval_patch_and_events(tmp_path):
