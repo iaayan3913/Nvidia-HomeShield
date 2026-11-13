@@ -7,7 +7,7 @@ HomeShield is a mock-first, local-AI workflow for turning resident hazard report
 1. Everyone: clone/pull, copy `.env.example` to `.env`, and read [docs/CONTRACTS.md](docs/CONTRACTS.md).
 2. Person 1: run `scripts/spark/smoke_test.sh` and `ollama_inventory.sh` on the Spark.
 3. Person 2: run the intake mock test and check `intake/agent.py` returns a `Case`.
-4. Person 3: start the API with `py -m uvicorn backend.app:app --reload` and open `/docs`.
+4. Person 3: start the API with `py -m uvicorn backend.app:app --reload --port 8001` and open `/docs`.
 5. Person 4: run `py -m scheduler.mock` and inspect the sample plan.
 6. Person 5: run `npm install` and `npm run dev` in `frontend/`.
 
@@ -18,7 +18,7 @@ py -m venv .venv
 .venv\Scripts\activate
 py -m pip install -r requirements.txt
 Copy-Item .env.example .env
-py -m uvicorn backend.app:app --reload
+py -m uvicorn backend.app:app --reload --port 8001
 ```
 
 In another PowerShell window:

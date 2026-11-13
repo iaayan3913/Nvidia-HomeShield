@@ -7,9 +7,9 @@ Own FastAPI, SQLite, rules, approvals, agent events, SSE, and integration. Do no
 ## Start
 
 ```powershell
-py -m uvicorn backend.app:app --reload
-Invoke-RestMethod http://127.0.0.1:8000/health
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/reports -ContentType 'application/json' -Body '{"text":"Gas smell in kitchen","property_id":"p-001"}'
+py -m uvicorn backend.app:app --reload --port 8001
+Invoke-RestMethod http://127.0.0.1:8001/health
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8001/api/reports -ContentType 'application/json' -Body '{"text":"Gas smell in kitchen","property_id":"p-001"}'
 ```
 
 Use `USE_MOCKS=true` first. Add real intake and scheduler by changing configuration only. Keep approval before notification/escalation and emit every event to SSE.

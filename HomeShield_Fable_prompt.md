@@ -49,7 +49,7 @@ Sheffield context for the pitch: 1,970 new disrepair cases in the year to April 
 - **128 GB unified memory** shared by the CPU and GPU, at **273 GB/s**. Token generation is limited by memory bandwidth, so MoE models with ~3B active parameters are fast and dense large models are slow.
 - Up to 1 PFLOP at FP4, so **NVFP4 weights are preferred**.
 - Runs DGX OS (Ubuntu-based) with Docker and the NVIDIA container stack.
-- **Access:** NVIDIA Sync app (SSH plus one-click Terminal, DGX Dashboard on port 11000, JupyterLab), or plain `ssh user@<ip>`. Use the IP if `.local` names don't resolve on venue Wi-Fi. Forward ports with `ssh -L 8000:localhost:8000 ...`.
+- **Access:** NVIDIA Sync app (SSH plus one-click Terminal, DGX Dashboard on port 11000, JupyterLab), or plain `ssh user@<ip>`. Use the IP if `.local` names don't resolve on venue Wi-Fi. For a laptop, forward Nano Omni safely with `ssh -L 18000:localhost:8000 ...`; keep local 8001 for FastAPI.
 
 **Team laptops:** mostly **Windows**, using VS Code or Cursor and **GitHub Desktop**. They are not using WSL.
 - All laptop instructions must give Windows/PowerShell commands (`py -m venv .venv`, `.venv\Scripts\activate`).
@@ -83,7 +83,7 @@ Sheffield context for the pitch: 1,970 new disrepair cases in the year to April 
   - `llm_client.py` must handle `reasoning_content`, `reasoning` and in-text `<think>` blocks.
 - **vLLM is an optional upgrade, not the default.** Use it only if Ollama's speed or model choice is a problem, following NVIDIA's "Serve LLMs with vLLM on One Device" playbook. The image tag is `VERIFY:` from the playbook. Run it in `tmux` with `--host 0.0.0.0` and an explicit `--gpu-memory-utilization` that leaves room for Ollama, cuOpt and the OS.
 - **Run each model once and share it.** No one runs their own copy.
-- **All application code reads `LLM_BASE_URL`, `LLM_API_KEY` and the model names from `.env`.** Switching between the hosted NVIDIA API, Ollama on the Spark and vLLM on the Spark must be a config change only. Provide three ready-made `.env` profiles.
+- **Intake reads `LLM_BASE_URL`, `LLM_API_KEY` and `INTAKE_MODEL`; the Python agent reads `AGENT_BASE_URL`, `AGENT_API_KEY` and `AGENT_MODEL`.** NemoClaw remains independently configured. Switching services must be a config change only. Provide ready-made `.env` profiles.
 
 **Optimisation:**
 - **NVIDIA cuOpt** (open source, Python API and REST server) for vehicle routing. Relevant features: time windows, heterogeneous fleet, order↔vehicle matching (worker skills), vehicle breaks, start and end locations, prize collection (priority), initial solution (warm start for re-planning), and precise time limits.

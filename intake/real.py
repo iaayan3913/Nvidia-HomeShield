@@ -6,7 +6,7 @@ import base64, json, mimetypes, re
 from pathlib import Path
 from uuid import uuid4
 from pydantic import ValidationError
-from backend.config import COMPONENT_TIMEOUT_SECONDS, INTAKE_MODEL
+from backend.config import COMPONENT_TIMEOUT_SECONDS, INTAKE_MODEL, LLM_API_KEY, LLM_BASE_URL
 from backend.llm_client import LLMClient, LLMError
 from backend.schemas import Case, Evidence
 
@@ -68,7 +68,8 @@ def parse_case(raw: str, text: str, photo_uri: str | None = None, audio_uri: str
 def analyse_report(text: str, photo_uri: str | None = None, audio_uri: str | None = None,
                    property_id: str | None = None) -> Case:
     try:
-        reply = LLMClient(model=INTAKE_MODEL).complete(_build_messages(text, photo_uri, audio_uri), temperature=0,
+        reply = LLMClient(base_url=LLM_BASE_URL, api_key=LLM_API_KEY, model=INTAKE_MODEL).complete(
+            _build_messages(text, photo_uri, audio_uri), temperature=0,
                                                        timeout=COMPONENT_TIMEOUT_SECONDS)
     except LLMError as exc:
         raise IntakeError(f"Intake model request failed: {exc}") from exc
