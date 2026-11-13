@@ -17,6 +17,7 @@ The dashboard on `main` exists only as a compiled build in `frontend/mock-build/
    Signs you have the right one: its `package.json` lists **maplibre-gl**, **@fontsource/ibm-plex-sans** and **@fontsource/ibm-plex-mono**, and **React 19**. The compiled build uses all of these, but the repo's current `frontend/package.json` lists none of the first three and pins React 18. If you cannot find it, stop and tell Enan; do not try to rebuild the UI from the minified bundle.
 2. **Copy it into `frontend/`** without losing the repo's existing files: `public/properties.geojson`, `public/roads-major.geojson`, `public/sample-*.json`, `mock-build/`.
    - Bring over `src/**`, `index.html`, `vite.config.*`, `tsconfig*.json`, `package.json` **and** `package-lock.json`, and any mock-data or asset files the source imports.
+   - **Also the map's local data files.** The map loads `./data/sheffield-meta.json`, `./data/sheffield-buildings.geojson`, `./data/sheffield-roads.geojson`, `./data/sheffield-water.geojson` and `./data/sheffield-green.geojson`, normally from `public/data/`. They are missing from git and from `mock-build/`, so put them in `frontend/public/data/`. Include whatever script produced them, if there is one. Note that `.gitignore` ignores `data/raw/` and `data/processed/` at the repo root only, not `frontend/public/data/`.
    - Keep the repo's `mock` script in `package.json` (`vite preview --outDir mock-build --port 4173 --strictPort`).
    - Never commit `node_modules/`, `dist/`, `.env` files or API keys.
 3. **Prove it builds from a clean checkout.**

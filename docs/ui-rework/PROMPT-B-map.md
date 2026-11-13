@@ -10,6 +10,26 @@ You are working on HomeShield, a hackathon demo (NVIDIA Hack for Impact, Sheffie
 
 **You own:** the `TwinMap` component and everything drawn on the map: layers, layer toggles, map legend, map tooltips and popups, camera. **Do not change** the app layout or tabs (workstream A, which merges first, so rebase onto it) or the case list and cards (workstream C). Read live plan and worker data through workstream C's data layer once it lands; until then, use the existing mock data.
 
+## Already done: map-focus helpers, ready to wire in
+
+These pure-TypeScript helpers are on `main` in `frontend/src/map-focus/`. They have no React, deck.gl or MapLibre imports, and are tested with `node --test tests/map-focus.test.ts` from `frontend/`. Use them; do not re-implement them.
+
+- `planDiff.ts`: `routesFromPlan(plan)` (backend Plan → `{workerId: stopIds[]}`) and `diffRoutes(prev, next)` → `changedWorkers`, `moved`, `added`, `removed`. For the mock data, write a 3-line adapter to the same `RouteMap` shape.
+- `routeFocus.ts`: `routeRenders(workerIds, {hoveredWorker, selectedWorker, showAll, replan, now})` returns only the routes to draw, each with `mode`, `opacity`, `widthPx`, `dashed`, `animate` and `plan` (`current` or `previous`). Also `replanProgress`, `isFocusActive`, `tripTimestamps(path)` for the TripsLayer, and `nextStopIndex(etas)`.
+- `labelZoom.ts`: `neighbourhoodLabelStyle(zoom, label)` → `{visible, sizePx, alpha}`; `zoomBucket(zoom)` for `updateTriggers`; and `applyBasemapLabelRules(map)` for MapLibre symbol layers.
+
+**What the current TwinMap draws** (from the compiled build; check it against the source):
+
+| Feedback | Layer in TwinMap | Change |
+|---|---|---|
+| Remove hotspots | `hotspots` (hexagon layer over cases), toggle key `hotspots` in the layer-toggle defaults, and a "Hotspot" tooltip branch | Delete all three |
+| Routes cluttered | `route-ghosts` (dashed PathLayer, visible when `layers.routes`), plus a route PathLayer or TripsLayer | Feed `routeRenders(...)` into them: static modes → PathLayer, `animate` → TripsLayer with `tripTimestamps` and `currentTime = now - replan.startedAt`, `plan: "previous"` → the previous plan's geometry |
+| Labels overlap when zoomed out | `neighbourhoods` TextLayer over 16 hard-coded names with a `major` flag | Filter with `neighbourhoodLabelStyle(zoom, d).visible`; `getSize` and alpha from it; `updateTriggers` on `zoomBucket(zoom)`; add `CollisionFilterExtension` from `@deck.gl/extensions` |
+| Basemap labels | MapLibre style from `https://tiles.openfreemap.org/planet` | Call `applyBasemapLabelRules(map)` on `style.load` |
+| Offline | Map mode `auto` with local `data/sheffield-*.geojson` | Probably already falls back; verify with Wi-Fi off before building anything (task 6) |
+
+Keep the previous plan's routes in a ref when a new plan arrives, so `diffRoutes(prev, next)` and the `previous` geometry are available. Start `replan = {changedWorkers, startedAt: performance.now()}`, and drive the animation with `requestAnimationFrame` only while `replanProgress` is not null.
+
 ## Why
 
 The map is the centrepiece the operator and the judges look at. Right now it is cluttered: every worker's full route is always drawn, a hotspots layer adds noise, and place labels pile on top of each other when you zoom out.
