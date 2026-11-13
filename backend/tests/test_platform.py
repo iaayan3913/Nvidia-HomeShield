@@ -143,3 +143,23 @@ def test_events_tail_returns_newest(tmp_path):
     every = client.get("/api/events").json()
     newest = client.get("/api/events", params={"tail": 2}).json()
     assert [e["sequence"] for e in newest] == [e["sequence"] for e in every[-2:]]
+
+
+def test_evening_report_is_scheduled_on_the_demo_clock(tmp_path):
+    """A report made after every fixture shift (21:00 wall clock) still gets a window on the scheduler's clock."""
+    def evening_intake(text, photo_uri, audio_uri, property_id):
+        return Case(id=f"case-{uuid4().hex[:8]}", hazard_type=HazardType.leak, severity=Severity.moderate,
+                    is_emergency=False, summary=text, property_id=property_id,
+                    created_at=datetime(2026, 11, 13, 21, 0, tzinfo=timezone.utc))
+    service = HomeShieldService(Store(str(tmp_path / "evening.sqlite3")), MockScheduler(), scheduler_seed_jobs=False,
+                                agent_runtime="mock", intake=evening_intake, intake_adapter="mock")
+    service.scheduling.clock.now = lambda: datetime(2026, 11, 13, 11, 0)
+    client = TestClient(create_app(service))
+    body = submit(client)
+    job_id = f"job-{body['case']['id']}"
+    assert body["plan"]["unassigned_jobs"] == []
+    assert any(stop["job_id"] == job_id for route in body["plan"]["workers"] for stop in route["stops"])
+    # The window start is fixed on first planning, so a later clock does not move it.
+    first = next(j for j in client.get("/api/jobs").json() if j["id"] == job_id)["earliest"]
+    service.scheduling.clock.now = lambda: datetime(2026, 11, 13, 14, 0)
+    assert next(j for j in client.get("/api/jobs").json() if j["id"] == job_id)["earliest"] == first

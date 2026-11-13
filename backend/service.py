@@ -243,10 +243,11 @@ class HomeShieldService:
             self.scheduling.resolve_property(case)
             if case.property_id != previous_property:
                 self.store.save_case(case, "Scheduler assigned a synthetic demo property")
-            # A case's scheduling window begins when the landlord became aware of
-            # it. Rebuilding old jobs with the current clock invalidated active
-            # ETAs and was the long-running-process 503 root cause.
-            job = case_to_job(case, now=case.created_at)
+            # A case's scheduling window is fixed the first time it is planned, on the
+            # scheduler's clock. Rebuilding old jobs with the current clock invalidated
+            # active ETAs (the long-running-process 503); using the wall-clock created_at
+            # instead left evening reports outside the demo-day shifts, so none could be planned.
+            job = case_to_job(case, now=self.records.schedule_start(case.id, self.scheduling.clock.now()))
             jobs[job.id] = job
         return list(jobs.values())
 
@@ -436,7 +437,7 @@ class HomeShieldService:
             if not property_location(case.property_id):
                 self.scheduling.resolve_property(case)  # deterministic; not saved here
             try:
-                job = case_to_job(case, now=case.created_at)
+                job = case_to_job(case, now=self.records.schedule_start(case.id) or self.scheduling.clock.now())
             except ValueError:
                 continue
             contact = (self.records.get_contact(case.id) or {}).get("contact", {})

@@ -81,7 +81,7 @@ Task: `frontend/tasks/v2-03-operative-platform.md`, implementing most of `v2-00-
 
 **Automated** (all run on this branch)
 - Backend: `backend/tests/test_platform.py` has 9 tests covering health/reset flag, property search, contact privacy across events/SSE/case JSON, multipart contact fields, the public case view, the full job-progress flow including 404/409/422, stream filters, dev reset and events tail.
-- Full backend suite with mock settings (`USE_MOCKS=true INTAKE_ADAPTER=mock AGENT_RUNTIME=mock SCHEDULER=mock SCHEDULER_ADAPTER=mock py -3.13 -m pytest backend`): **49 passed**. With the local `.env` (`USE_MOCKS=false`, real model adapter) 14 existing tests fail because they call the real model endpoints; that is unrelated to this branch.
+- Full backend suite with mock settings (`USE_MOCKS=true INTAKE_ADAPTER=mock AGENT_RUNTIME=mock SCHEDULER=mock SCHEDULER_ADAPTER=mock py -3.13 -m pytest backend`): **50 passed**. With the local `.env` (`USE_MOCKS=false`, real model adapter) 14 existing tests fail because they call the real model endpoints; that is unrelated to this branch.
 - Frontend platform tests:
   - `shared/mock/api/api.test.ts`: mapping, reducer duplicates and out-of-order events, stream reconnect/backoff/resume with a fake `EventSource`, service load, patch and connection states, typed errors, resident scope and multipart.
   - `shared/mock/trackedCase.test.ts`: public endpoint only, per-case stream, not_found/idle.
@@ -113,7 +113,7 @@ Task: `frontend/tasks/v2-03-operative-platform.md`, implementing most of `v2-00-
 
 ## Limitations and requested backend changes not made
 
-- **Bug found, not fixed (backend owner):** since `main` started building case jobs from `case.created_at`, a report made in *real* time after a skill's last fixture shift ends (for example plumbing after 17:00 UTC) can never be scheduled when `SCHEDULER_CLOCK=demo`. The fixture shifts are fixed to 13 Nov 07:00–18:00, while `created_at` is the wall clock. The plan reports "no 'plumbing' worker on shift during its window". Evening demos will show unassigned jobs. Suggested fix: in demo mode, map `created_at` onto the demo clock, or use `max(created_at, clock.now())` within the demo day. `test_platform.py` pins the intake time so it is not affected.
+- **Bug found and fixed:** since `main` started building case jobs from `case.created_at` (wall clock), a report made after a skill's last fixture shift (for example plumbing after 17:00 UTC) could never be scheduled with `SCHEDULER_CLOCK=demo`. Each case's window start is now fixed on the scheduler's clock the first time it is planned and stored in `PrivateRecords.case_schedule_start`, so ETAs stay stable (the original reason for the change) and evening reports are planned. Covered by `test_evening_report_is_scheduled_on_the_demo_clock`; the existing long-running scheduler test still passes.
 - A job marked `unable_to_complete` keeps that status if a later approved plan reassigns it. Progress should be cleared for re-planned jobs on approval.
 - `generateScheduleProposal` uses the agent tool endpoints (`schedule_job` then `request_approval`). A dedicated `POST /api/cases/{id}/schedule` would be cleaner.
 - `ReportIn` has no category. The resident's category is only used to word the generated text for media-only reports.
