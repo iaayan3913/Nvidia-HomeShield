@@ -1,0 +1,8 @@
+mould.jpg (expected: damp_mould, significant, not emergency)
+Black mould spots are spreading across my bedroom wall and my 4-year-old sleeps in there. It keeps coming back every time I wipe it off.
+
+leak.jpg (expected: leak, moderate, not emergency)
+The kitchen ceiling is peeling and has brown stains since the flat upstairs had a leak. The plaster still feels damp when I touch it.
+
+socket.jpg (expected: electrical, emergency)
+The socket in my living room burnt out and the cover fell off. There are scorch marks and bare wires showing, and my children are in the house.

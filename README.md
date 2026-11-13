@@ -47,6 +47,7 @@ See the five role runbooks in [docs/roles](docs/roles) and the shared gates in [
 - `backend/`: FastAPI routes and Pydantic contracts
 - `intake/`, `agent/`, `scheduler/`, `store/`: replaceable application components
 - `frontend/`: offline-first React dashboard starter
+- `frontend/mock-build/`: prebuilt HomeShield dashboard running on mock data only (not yet wired to the backend); serve with `npm run mock` in `frontend/` → http://localhost:4173
 - `data/`: deterministic synthetic fixtures and map export helpers
 - `scripts/spark/`: Spark checks and endpoint helpers
 

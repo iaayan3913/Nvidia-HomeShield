@@ -2,8 +2,8 @@
 
 | Role | Items | Done | % | Status |
 |---|---:|---:|---:|---|
-| Person 1 | 8 | 4 | 50% | started |
-| Person 2 | 7 | 0 | 0% | not started |
+| Person 1 | 8 | 5 | idk% | started |
+| Person 2 | 7 | 7 | 100% | done |
 | Person 3 | 9 | 0 | 0% | not started |
 | Person 4 | 8 | 8 | 100% | done |
 | Person 5 | 9 | 0 | 0% | not started |
@@ -16,18 +16,18 @@
 - [x] **[Person 1 | 10:35-10:45]** Check installed Ollama models; done when exact names are recorded privately in `.env`.
 - [ ] **[Person 1 | 10:45-11:30]** Start Nano Omni or the best available vision model; done when Person 2 can call it.
 - [ ] **[Person 1 | 11:30-12:15]** Install/configure NemoClaw with OpenShell; done when one approved tool call succeeds.
-- [ ] **[Person 1 | 12:15 checkpoint]** If NemoClaw is not working after 45 minutes, switch to Python fallback; done when fallback is available.
+- [x] **[Person 1 | 12:15 checkpoint]** If NemoClaw is not working after 45 minutes, switch to Python fallback; done when fallback is available.
 - [ ] **[Person 1 | 13:00 onward]** Keep servers running and prepare hosted fallback; done when the team can demo offline and hosted profiles.
 
 ## Person 2 — Multimodal intake
 
-- [ ] **[Person 2 | 10:00-10:30]** Create `analyse_report()` accepting text/photo/audio; done when the mock returns a valid Case.
-- [ ] **[Person 2 | 10:30-11:15]** Connect shared Nano Omni API; done when one real request is parsed.
-- [ ] **[Person 2 | 11:15-11:45]** Validate structured JSON and null missing details; done when invalid output produces a clear error.
-- [ ] **[Person 2 | 11:45-12:15]** Test mould, leak and electrical reports; done when all three fixtures pass.
-- [ ] **[Person 2 | 12:15-12:45]** Add text-only fallback and helpful request errors; done when it works with `USE_MOCKS=true`.
-- [ ] **[Person 2 | 13:00 checkpoint]** Hand function to Person 3; done when API creates a case from the adapter.
-- [ ] **[Person 2 | 15:00 checkpoint]** Verify model path or freeze mock; done when demo input is reliable.
+- [x] **[Person 2 | 10:00-10:30]** Create `analyse_report()` accepting text/photo/audio; done when the mock returns a valid Case. _Note: `intake/agent.py` + `intake/mock.py`; mock returns a valid Case with photo/audio evidence._
+- [x] **[Person 2 | 10:30-11:15]** Connect shared Nano Omni API; done when one real request is parsed. _Note: live on the Spark (`nemotron_3_nano_omni`): all 3 demo photos correct in 2-6s with thinking off; voice notes (wav) work too. Hosted backup in `.env.hosted` also verified._
+- [x] **[Person 2 | 11:15-11:45]** Validate structured JSON and null missing details; done when invalid output produces a clear error. _Note: Pydantic-validated; unstated fields stay null; bad JSON raises `IntakeError`._
+- [x] **[Person 2 | 11:45-12:15]** Test mould, leak and electrical reports; done when all three fixtures pass. _Note: `intake/tests/test_intake.py` passes; demo photos + texts in `demo-photos/`._
+- [x] **[Person 2 | 12:15-12:45]** Add text-only fallback and helpful request errors; done when it works with `USE_MOCKS=true`. _Note: `INTAKE_ADAPTER=mock` works offline and gives the same hazard/severity/room/child result as the real model on all 3 demo reports; model errors/timeouts give a clear message._
+- [x] **[Person 2 | 13:00 checkpoint]** Hand function to Person 3; done when API creates a case from the adapter. _Note: merged to main; backend upload tests run the real adapter end to end._
+- [x] **[Person 2 | 15:00 checkpoint]** Verify model path or freeze mock; done when demo input is reliable. _Note: verified 12:30: Spark correct and fast on all demo photos + a voice note; hosted backup and mock both give the same results. Re-run `py -3.13 -m intake.try_live` before the demo._
 
 ## Person 3 — Backend, compliance and orchestration
 

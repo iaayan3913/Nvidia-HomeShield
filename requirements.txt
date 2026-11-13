@@ -6,6 +6,7 @@ httpx
 openai
 pyyaml
 python-multipart
+tzdata
 pytest
 ortools  # scheduler fallback (pure-Python mock still works without it)
 # Optional: cuopt (Spark GPU, VERIFY aarch64), osmnx (real roads + travel matrix)

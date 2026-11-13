@@ -8,11 +8,16 @@ def mock_case(text: str, photo_uri: str | None = None, property_id: str | None =
         hazard, severity = HazardType.gas, Severity.emergency
     elif "leak" in lower or "water" in lower:
         hazard, severity = HazardType.leak, Severity.moderate
-    elif "electric" in lower or "socket" in lower:
-        hazard, severity = HazardType.electrical, Severity.significant
+    elif any(w in lower for w in ("electric", "socket", "wire")):
+        danger = any(w in lower for w in ("bare wire", "exposed", "burn", "scorch", "spark", "smoke"))
+        hazard, severity = HazardType.electrical, Severity.emergency if danger else Severity.significant
     else:
         hazard, severity = HazardType.damp_mould, Severity.significant
+    vulnerable = [label for label, words in (("child", ("child", "kid", "baby", "toddler", "year-old")),
+                                             ("elderly", ("elderly", "pensioner", "grandparent")))
+                  if any(w in lower for w in words)]
+    room = next((r for r in ("bedroom", "kitchen", "living room", "bathroom", "hallway") if r in lower), None)
     evidence = [Evidence(kind=kind, uri=uri) for kind, uri in (("photo", photo_uri), ("audio", audio_uri)) if uri]
     return Case(id=f"case-{uuid4().hex[:8]}", hazard_type=hazard, severity=severity,
                 is_emergency=severity == Severity.emergency, summary=text[:1000] or "Resident report",
-                evidence=evidence, property_id=property_id)
+                evidence=evidence, property_id=property_id, room=room, vulnerable_occupants=vulnerable)

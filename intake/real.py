@@ -21,8 +21,10 @@ Reply with ONE JSON object only, no prose, using exactly these keys:
  "severity": "routine|moderate|significant|emergency",
  "is_emergency": true or false (immediate risk to health or safety, e.g. gas smell, exposed live wiring, fire, major flooding),
  "room": "room name or null",
- "vulnerable_occupants": ["child", "elderly", "disabled", "pregnant", "respiratory_condition"] or [],
+ "vulnerable_occupants": only those the report actually mentions, from ["child", "elderly", "disabled", "pregnant", "respiratory_condition"], else [],
  "summary": "one neutral sentence describing the hazard"}
+Classify hazard_type by root cause: water coming in from pipes, roof or a neighbouring flat is "leak" even if it has caused damp or stains; use "damp_mould" for condensation and mould growth.
+Severity guide: emergency = immediate danger to life or safety; significant = a health risk, e.g. damp or mould where a child, elderly or ill person lives or sleeps, or a leak near electrics; moderate = needs repair but no direct health risk; routine = cosmetic.
 Use null for anything the report does not state. Never include names, phone numbers, emails or addresses in any field."""
 
 def _local_file(path: str | None) -> Path | None:
@@ -56,9 +58,19 @@ def parse_case(raw: str, text: str, photo_uri: str | None = None, audio_uri: str
     if not isinstance(data, dict):
         raise IntakeError("Intake model did not return a JSON object")
     fields = {k: data[k] for k in MODEL_FIELDS if data.get(k) is not None}  # unknown keys dropped, nulls stay null
+    for key in ("hazard_type", "severity"):  # tolerate "Leak" / " moderate "
+        if isinstance(fields.get(key), str):
+            fields[key] = fields[key].strip().lower()
+    if isinstance(fields.get("vulnerable_occupants"), str):
+        fields["vulnerable_occupants"] = [fields["vulnerable_occupants"]]
+    if data.get("is_emergency") is True:
+        fields["severity"] = "emergency"  # err on the side of safety when the model's two signals disagree
+    if (fields.get("hazard_type") == "damp_mould" and fields.get("vulnerable_occupants")
+            and fields.get("severity") in ("routine", "moderate")):
+        fields["severity"] = "significant"  # the model wavers here; damp/mould with vulnerable occupants is a health risk
     try:
         return Case(id=f"case-{uuid4().hex[:8]}", **fields, summary=data.get("summary") or text[:1000],
-                    is_emergency=data.get("is_emergency") is True or fields.get("severity") == "emergency",
+                    is_emergency=fields.get("severity") == "emergency",
                     evidence=[Evidence(kind=k, uri=u) for k, u in (("photo", photo_uri), ("audio", audio_uri)) if u],
                     property_id=property_id)
     except ValidationError as exc:
@@ -69,8 +81,10 @@ def analyse_report(text: str, photo_uri: str | None = None, audio_uri: str | Non
                    property_id: str | None = None) -> Case:
     try:
         reply = LLMClient(base_url=LLM_BASE_URL, api_key=LLM_API_KEY, model=INTAKE_MODEL).complete(
-            _build_messages(text, photo_uri, audio_uri), temperature=0,
-                                                       timeout=COMPONENT_TIMEOUT_SECONDS)
+            # 4096: reasoning models spend tokens thinking first; too few returns empty content
+            _build_messages(text, photo_uri, audio_uri), temperature=0, max_tokens=4096,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},  # vLLM/Nemotron: 4-10x faster, accuracy kept by the prompt
+            timeout=COMPONENT_TIMEOUT_SECONDS)
     except LLMError as exc:
         raise IntakeError(f"Intake model request failed: {exc}") from exc
     return parse_case(reply["content"], text, photo_uri, audio_uri, property_id)

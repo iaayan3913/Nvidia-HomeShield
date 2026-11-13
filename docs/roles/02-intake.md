@@ -23,8 +23,10 @@ Implement mock-first, then configure the endpoint from `.env`. Test mould, leak,
 
 ## Checklist
 
-- [ ] `analyse_report()` accepts text, photo, and audio references.
-- [ ] Mould, leak, and electrical fixtures parse.
-- [ ] Model JSON is validated and missing values become null.
-- [ ] Text-only fallback works offline.
-- [ ] Person 3 can consume the returned `Case`.
+All done (12:30): Spark Nano Omni verified on all 3 demo photos (2-6s) and a wav voice note; hosted backup and mock give matching results. Before the demo, re-run `py -3.13 -m intake.try_live`.
+
+- [x] `analyse_report()` accepts text, photo, and audio references. _Note: photo + audio via backend uploads; audio off until Person 1 confirms format._
+- [x] Mould, leak, and electrical fixtures parse. _Note: tested; demo photos in `demo-photos/`._
+- [x] Model JSON is validated and missing values become null. _Note: invalid JSON -> clear `IntakeError`._
+- [x] Text-only fallback works offline. _Note: `INTAKE_ADAPTER=mock`._
+- [x] Person 3 can consume the returned `Case`. _Note: merged to main, backend tests pass._
