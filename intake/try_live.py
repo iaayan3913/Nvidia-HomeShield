@@ -3,12 +3,14 @@
 Reads LLM_BASE_URL / LLM_API_KEY / INTAKE_MODEL from .env. A voice note named like the photo
 (e.g. demo-photos/socket.wav or .mp3) is sent too, if present.
 """
+import sys
 from pathlib import Path
 from time import perf_counter
 from backend.config import INTAKE_MODEL, LLM_BASE_URL
 from intake.real import IntakeError, analyse_report
 
 DEMO = Path(__file__).resolve().parents[1] / "demo-photos"
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # Windows consoles default to cp1252; model text can include Unicode
 
 print(f"Model {INTAKE_MODEL} at {LLM_BASE_URL}\n")
 for block in (DEMO / "reports.txt").read_text(encoding="utf-8").strip().split("\n\n"):

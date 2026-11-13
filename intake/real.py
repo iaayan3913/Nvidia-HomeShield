@@ -23,6 +23,7 @@ Reply with ONE JSON object only, no prose, using exactly these keys:
  "room": "room name or null",
  "vulnerable_occupants": ["child", "elderly", "disabled", "pregnant", "respiratory_condition"] or [],
  "summary": "one neutral sentence describing the hazard"}
+Classify hazard_type by root cause: water coming in from pipes, roof or a neighbouring flat is "leak" even if it has caused damp or stains; use "damp_mould" for condensation and mould growth.
 Use null for anything the report does not state. Never include names, phone numbers, emails or addresses in any field."""
 
 def _local_file(path: str | None) -> Path | None:
