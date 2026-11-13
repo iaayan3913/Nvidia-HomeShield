@@ -17,8 +17,9 @@ def mock_case(text: str, photo_uri: str | None = None, property_id: str | None =
                                              ("elderly", ("elderly", "pensioner", "grandparent")),
                                              ("respiratory_condition", ("asthma", "breathing", "respiratory", "copd")))
                   if any(w in lower for w in words)]
-    if hazard == HazardType.damp_mould and "respiratory_condition" in vulnerable:
-        severity = Severity.emergency  # VERIFY: Awaab's Law guidance example - child's asthma worsened by bedroom mould
+    symptoms = any(w in lower for w in ("cough", "wheez", "chest infection"))
+    if hazard == HazardType.damp_mould and ("respiratory_condition" in vulnerable or symptoms):
+        severity = Severity.emergency  # VERIFY: Awaab's Law Phase 2 triage guidance - vulnerable or already symptomatic
     room = next((r for r in ("bedroom", "kitchen", "living room", "bathroom", "hallway") if r in lower), None)
     evidence = [Evidence(kind=kind, uri=uri) for kind, uri in (("photo", photo_uri), ("audio", audio_uri)) if uri]
     return Case(id=f"case-{uuid4().hex[:8]}", hazard_type=hazard, severity=severity,
