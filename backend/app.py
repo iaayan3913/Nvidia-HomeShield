@@ -12,14 +12,16 @@ from starlette.datastructures import UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from agent.tools import TOOL_NAMES, TOOLS
-from backend.config import CORS_ORIGINS, DEMO_SEED, USE_MOCKS
-from backend.schemas import ApprovalIn, CasePatch, DecisionIn, EmergencyIn, ReportIn, StatusIn
+from backend.config import ALLOW_DEV_RESET, CORS_ORIGINS, DEMO_SEED, USE_MOCKS
+from backend.schemas import (ApprovalIn, CasePatch, ContactIn, DecisionIn, EmergencyIn, JobProgressIn, ReportIn,
+                             StatusIn)
 from backend.service import HomeShieldService
 from backend.uploads import UploadValidationError
 
 
-def create_app(service: HomeShieldService | None = None) -> FastAPI:
+def create_app(service: HomeShieldService | None = None, *, allow_dev_reset: bool | None = None) -> FastAPI:
     backend = service or HomeShieldService()
+    dev_reset = ALLOW_DEV_RESET if allow_dev_reset is None else allow_dev_reset
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -33,9 +35,11 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
                        allow_methods=["*"], allow_headers=["*"])
 
     @api.get("/health")
+    @api.get("/api/health")  # same payload under /api so dev proxies need only one rule
     def health():
         return {"status": "ok", "mocks": USE_MOCKS, "database": "sqlite",
-                "scheduler": backend.scheduler_status(), "agent_runtime": backend.agent_runtime}
+                "scheduler": backend.scheduler_status(), "agent_runtime": backend.agent_runtime,
+                "dev_reset": dev_reset}
 
     async def report_response(report: ReportIn):
         try:
@@ -88,9 +92,16 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
                 stored_audio = await backend.upload_store.save(audio, "audio")
                 audio_ref = stored_audio.reference
                 saved.append(audio_ref)
+            def field(name: str) -> str | None:
+                value = form.get(name)
+                return str(value).strip() or None if isinstance(value, str) else None
+            contact = {key: field(f"contact_{key}") for key in ("name", "phone", "email", "preferred")}
+            contact["access_notes"] = field("access_notes")
             report = ReportIn(text=str(form.get("text") or ""),
                               property_id=str(form["property_id"]) if form.get("property_id") else None,
-                              photo_uri=photo_ref, audio_uri=audio_ref)
+                              photo_uri=photo_ref, audio_uri=audio_ref,
+                              contact=ContactIn(**contact) if any(contact.values()) else None,
+                              address_line=field("address_line"), postcode=field("postcode"))
         except UploadValidationError as exc:
             for reference in saved:
                 backend.upload_store.discard(reference)
@@ -209,7 +220,10 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
         return decide(pending[0].id, DecisionIn(), True)
 
     @api.get("/api/events")
-    def list_events(after: int = Query(default=0, ge=0), limit: int = Query(default=200, ge=1, le=1000)):
+    def list_events(after: int = Query(default=0, ge=0), limit: int = Query(default=200, ge=1, le=1000),
+                    tail: int | None = Query(default=None, ge=1, le=1000, description="Return only the newest N events")):
+        if tail:
+            after, limit = max(0, backend.latest_event_sequence() - tail), tail
         return [{"sequence": sequence, **event.model_dump(mode="json")}
                 for sequence, event in backend.store.list_events(after, limit)]
 
@@ -240,22 +254,67 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
                          tool_name=tool_name, success=False)
             raise HTTPException(422, "Invalid tool arguments") from exc
 
+    @api.get("/api/properties")
+    def list_properties(q: str = Query(default="", max_length=100), limit: int = Query(default=50, ge=1, le=500)):
+        return backend.list_properties(q, limit)
+
+    @api.get("/api/cases/{case_id}/public")
+    def get_public_case(case_id: str):
+        try:
+            return backend.public_case(case_id)
+        except KeyError as exc:
+            raise HTTPException(404, "Case not found") from exc
+
+    @api.get("/api/jobs")
+    def list_jobs():
+        return backend.list_jobs()
+
+    @api.post("/api/jobs/{job_id}/progress")
+    def job_progress(job_id: str, update: JobProgressIn):
+        notes = (update.notes or "").strip() or None
+        if update.status in {"completed", "unable_to_complete"} and not notes:
+            raise HTTPException(422, "Add a short note for completed or unable-to-complete jobs")
+        try:
+            return backend.record_job_progress(job_id, update.status, notes, update.evidence_count)
+        except KeyError as exc:
+            raise HTTPException(404, "Job not found") from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @api.post("/api/dev/reset")
+    def dev_reset_endpoint():
+        if not dev_reset:
+            raise HTTPException(404, "Not found")
+        backend.reset()
+        return {"status": "reset"}
+
     @api.get("/api/stream")
     async def stream(request: Request, last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
-                     once: bool = Query(default=False, description="Return currently available events then close")):
+                     once: bool = Query(default=False, description="Return currently available events then close"),
+                     after: int | None = Query(default=None, ge=0, description="Start after this sequence"),
+                     tail: bool = Query(default=False, description="Start after the newest event (no replay)"),
+                     case_id: str | None = Query(default=None, max_length=100,
+                                                 description="Only send events for this case")):
         try:
-            cursor = max(0, int(last_event_id or 0))
+            cursor = max(0, int(last_event_id)) if last_event_id else None
         except ValueError:
-            cursor = 0
+            cursor = None
+        if cursor is None:
+            cursor = after if after is not None else backend.latest_event_sequence() if tail else 0
 
         async def events():
             nonlocal cursor
             heartbeat = 0
+            if not once:
+                # Flush headers now so EventSource (and dev proxies) report the connection as open.
+                yield ": connected\n\n"
             while not await request.is_disconnected():
                 rows = backend.store.list_events(cursor, 100)
                 if rows:
                     for sequence, event in rows:
                         cursor = sequence
+                        if case_id and event.case_id != case_id:
+                            continue
                         data = json.dumps(event.model_dump(mode="json"), separators=(",", ":"))
                         yield f"id: {sequence}\nevent: {event.type}\ndata: {data}\n\n"
                     heartbeat = 0

@@ -5,7 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev:resident": "vite --mode resident",
+    "dev:resident:https": "vite --mode resident",
+    "dev:staff": "vite --mode staff",
+    "build": "tsc -b && vite build --mode resident && vite build --mode staff",
+    "build:resident": "vite build --mode resident",
+    "build:staff": "vite build --mode staff",
+    "preview:resident": "vite preview --mode resident --outDir dist/resident",
+    "preview:staff": "vite preview --mode staff --outDir dist/staff",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -25,6 +32,7 @@
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.1",
     "typescript": "~5.7.3",
