@@ -63,3 +63,12 @@ describe('helpers', () => {
     expect(trackingStage({ status: 'scheduled' }, { status: 'unable_to_complete', operativeFirstName: null }).outcome).toBe('unable');
   });
 });
+
+describe('report references', () => {
+  it('keeps backend references lower-case and local references upper-case', async () => {
+    const { normaliseReference } = await import('./model');
+    expect(normaliseReference('  CASE-0EDCA98B ')).toBe('case-0edca98b');
+    expect(normaliseReference('case-0edca98b')).toBe('case-0edca98b');
+    expect(normaliseReference('hs-26043')).toBe('HS-26043');
+  });
+});

@@ -31,6 +31,9 @@ export const CATEGORIES: ResidentCategory[] = [
   { id: 'other', hazard: 'other', label: 'Something else', hint: 'Any other repair or safety worry in your home', icon: CircleHelp },
 ];
 
+/** Backend references are lower-case (`case-1a2b3c4d`); local references are upper-case (`HS-26043`). Keep each form exact. */
+export const normaliseReference = (value: string) => { const trimmed = value.trim(); return /^case-/i.test(trimmed) ? trimmed.toLowerCase() : trimmed.toUpperCase(); };
+
 export const categoryById = (id: ResidentCategoryId | '') => CATEGORIES.find((item) => item.id === id);
 
 export const ROOMS = ['Kitchen', 'Bathroom or toilet', 'Bedroom', 'Living room', 'Hallway or stairs', 'Several rooms', 'Outside or shared area'];

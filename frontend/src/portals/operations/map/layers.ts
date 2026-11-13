@@ -27,20 +27,20 @@ export function caseLayers(cases: CaseScene[], palette: MapPalette, show: { buil
   const labelled = cases.filter((c) => c.marker.emergency || c.marker.propertyId === selectedPropertyId);
   return [
     new SolidPolygonLayer<CaseScene>({
-      id: LAYER_IDS.caseBuildings, data: cases, visible: show.buildings, extruded: true,
+      id: LAYER_IDS.caseBuildings, data: cases, visible: show.buildings && cases.length > 0, extruded: true,
       getPolygon: (d) => d.shell, getElevation: (d) => d.height,
       getFillColor: (d) => withAlpha(palette.severity[d.marker.severity], 245),
       pickable: true, autoHighlight: true, highlightColor: withAlpha(palette.selected, 140),
       material: { ambient: 0.55, diffuse: 0.55, shininess: 12 },
     }),
     new SolidPolygonLayer<CaseScene>({
-      id: 'hazard-glow', data: cases, visible: show.hazards, extruded: true,
+      id: 'hazard-glow', data: cases, visible: show.hazards && cases.length > 0, extruded: true,
       getPolygon: (d) => d.glowRing, getElevation: (d) => d.height + HAZARD_COLUMN_RISE + 6,
       getFillColor: (d) => withAlpha(palette.hazard[d.marker.hazard], d.marker.emergency ? 45 + 60 * wave : 34),
       updateTriggers: { getFillColor: wave }, parameters: GLOW, material: false,
     }),
     new SolidPolygonLayer<CaseScene>({
-      id: LAYER_IDS.hazard, data: cases, visible: show.hazards, extruded: true,
+      id: LAYER_IDS.hazard, data: cases, visible: show.hazards && cases.length > 0, extruded: true,
       getPolygon: (d) => d.columnRing, getElevation: (d) => d.height + HAZARD_COLUMN_RISE,
       getFillColor: (d) => withAlpha(palette.hazard[d.marker.hazard], 235),
       pickable: true, autoHighlight: true, highlightColor: withAlpha(palette.selected, 160), material: false,
@@ -66,7 +66,7 @@ export function caseLayers(cases: CaseScene[], palette: MapPalette, show: { buil
 export function densityLayers(bins: HexBin[], palette: MapPalette, visible: boolean) {
   const max = Math.max(1, ...bins.map((b) => b.count));
   return [new SolidPolygonLayer<HexBin>({
-    id: LAYER_IDS.density, data: bins, visible, extruded: true, getPolygon: (d) => d.ring, getElevation: (d) => 20 + 140 * (d.count / max),
+    id: LAYER_IDS.density, data: bins, visible: visible && bins.length > 0, extruded: true, getPolygon: (d) => d.ring, getElevation: (d) => 20 + 140 * (d.count / max),
     getFillColor: (d) => withAlpha(palette.density, 60 + 140 * (d.count / max)), pickable: true, material: false,
     parameters: { depthWriteEnabled: false },
   })];

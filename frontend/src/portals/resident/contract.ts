@@ -1,3 +1,4 @@
+import { normaliseReference } from './model';
 /** Resident-specific helpers over the shared live/local data service. */
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -51,7 +52,7 @@ export interface TrackedCase { case: Case | null; status: TrackStatus; retry(): 
 
 /** API mode uses the resident-safe public case endpoint and case-scoped SSE stream. */
 export function useTrackedCase(reference: string | null): TrackedCase {
-  const ref = reference?.trim().toUpperCase() || null;
+  const ref = reference ? normaliseReference(reference) || null : null;
   const tracked = useSharedTrackedCase(ref);
   const [localAttempt, setLocalAttempt] = useState(0);
   const [localSettled, setLocalSettled] = useState<string | null>(null);

@@ -4,16 +4,16 @@ import { Button } from '../../../shared/components/Button';
 import { Input } from '../../../shared/components/FormControls';
 import { useTrackedCase } from '../contract';
 import { TRACK_STAGES, UNABLE_LABEL, formatDateTime, needsUrgentAttention, trackingStage } from '../caseLabels';
-import { CATEGORIES } from '../model';
+import { CATEGORIES, normaliseReference } from '../model';
 
-const REFERENCE_SHAPE = /^[A-Z]{2,}-[A-Z0-9-]+$/;
+const REFERENCE_SHAPE = /^[A-Z]{2,}-[A-Z0-9-]+$/i;
 
 export function TrackReport({ initialReference, recentReferences, onReferenceChange }: { initialReference: string; recentReferences: string[]; onReferenceChange: (reference: string) => void }) {
   const [query, setQuery] = useState(initialReference);
   const [error, setError] = useState<string | undefined>();
   const resultRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  const searched = initialReference.trim().toUpperCase() || null;
+  const searched = normaliseReference(initialReference) || null;
   const tracked = useTrackedCase(searched);
 
   useEffect(() => { setQuery(initialReference); }, [initialReference]);
@@ -25,7 +25,7 @@ export function TrackReport({ initialReference, recentReferences, onReferenceCha
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const reference = query.trim().toUpperCase();
+    const reference = normaliseReference(query);
     if (!reference) { setError('Enter your report reference, for example HS-26043.'); return; }
     if (!REFERENCE_SHAPE.test(reference)) { setError('Check the reference. It looks like HS-26043.'); return; }
     lookUp(reference);
