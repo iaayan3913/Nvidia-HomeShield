@@ -82,4 +82,5 @@ If `case.property_id` is missing or unknown, `add_case` assigns a stable synthet
 - How many *other* jobs move to absorb the emergency varies with the travel matrix, the time of day and OR-Tools' time-limited search (0–10 in tests); the receiving worker's route always changes and nothing is dropped at 11:00.
 - cuOpt adapter checked against the cuOpt Python routing API reference; fixed route parsing (`get_route()` returns location indices, not order ids). Not yet run on a GPU.
 - cuOpt 26.10.1 (cu13) installed on the Spark by Person 1 in `~/cuopt-env`; import check OK.
+- Backend integration done by Fowzan (Person 3): `HomeShieldService` uses `get_scheduler()`, `SchedulingService`, `case_to_job` and warm-start `replan()` (`backend/tests/test_scheduler_integration.py`).
 - Next: on the Spark, `PYTHON=~/cuopt-env/bin/python bash scripts/spark/check_cuopt.sh --deps`, then paste `data/generated/cuopt_status.txt` here.
