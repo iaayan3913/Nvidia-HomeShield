@@ -5,9 +5,9 @@ from threading import RLock
 from uuid import uuid4
 
 from agent.rules import compute_deadlines
-from backend.config import DATABASE_PATH, SCHEDULER_ADAPTER
+from backend.config import DATABASE_PATH, INTAKE_ADAPTER, INTAKE_AUDIO_ENABLED, SCHEDULER_ADAPTER
 from backend.schemas import (
-    AgentEvent, Approval, ApprovalStatus, Case, CasePatch, CaseStatus, DecisionIn,
+    AgentEvent, Approval, ApprovalStatus, Case, CasePatch, CaseStatus, DecisionIn, Evidence,
     HazardType, Job, Plan, ReportIn, Severity, Skill, Worker, utc_now,
 )
 from intake.agent import analyse_report
@@ -15,6 +15,7 @@ from scheduler.cuopt import CuOptScheduler
 from scheduler.mock import MockScheduler
 from scheduler.ortools import OrToolsScheduler
 from store.sqlite import Store
+from backend.uploads import StoredUpload, UploadStore
 
 
 def _event_id() -> str:
@@ -32,9 +33,15 @@ def _skill(case: Case) -> Skill:
 
 
 class HomeShieldService:
-    def __init__(self, store: Store | None = None, scheduler=None):
+    def __init__(self, store: Store | None = None, scheduler=None, *, intake=None,
+                 intake_adapter: str = INTAKE_ADAPTER, upload_store: UploadStore | None = None,
+                 intake_audio_enabled: bool = INTAKE_AUDIO_ENABLED):
         self.store = store or Store(DATABASE_PATH)
         self.scheduler = scheduler or self._scheduler()
+        self.intake = intake or analyse_report
+        self.intake_adapter = intake_adapter
+        self.upload_store = upload_store or UploadStore()
+        self.intake_audio_enabled = intake_audio_enabled
         self._decision_lock = RLock()
 
     @staticmethod
@@ -54,14 +61,45 @@ class HomeShieldService:
 
     def submit_report(self, report: ReportIn, *, force_emergency: bool = False) -> tuple[Case, Plan | None, Approval]:
         try:
-            case = analyse_report(report.text, report.photo_uri, report.audio_uri, report.property_id)
+            photo = self._stored_media(report.photo_uri, "photo")
+            audio = self._stored_media(report.audio_uri, "audio")
+            photo_input = str(photo.path) if photo and self.intake_adapter == "real" else report.photo_uri
+            audio_input = report.audio_uri
+            audio_status = "not_provided"
+            if audio:
+                if self.intake_adapter == "real" and self.intake_audio_enabled:
+                    audio_input = str(audio.path)
+                    audio_status = "submitted"
+                elif self.intake_adapter == "real":
+                    audio_input = None
+                    audio_status = "stored_not_analysed"
+                else:
+                    audio_status = "stored_mock_only"
+            try:
+                case = self.intake(report.text, photo_input, audio_input, report.property_id)
+            except Exception:
+                if audio and self.intake_adapter == "real" and self.intake_audio_enabled:
+                    # A confirmed text/photo result is preferable to losing the report when audio parts are unsupported.
+                    case = self.intake(report.text, photo_input, None, report.property_id)
+                    audio_status = "stored_audio_rejected_by_adapter"
+                else:
+                    raise
             if not isinstance(case, Case):
                 case = Case.model_validate(case)
-            self.emit("intake.completed", "Report intake completed", case.id, success=True)
+            self._normalise_evidence(case, photo, audio, audio_status)
+            self.emit("intake.completed", "Report intake completed", case.id, success=True,
+                      payload={"adapter": self.intake_adapter,
+                               "photo": "submitted" if photo and self.intake_adapter == "real" else
+                                        "stored_mock_only" if photo else "not_provided",
+                               "audio": audio_status})
+            if audio_status in {"stored_not_analysed", "stored_audio_rejected_by_adapter"}:
+                self.emit("intake.media_unavailable", "Audio was stored but not analysed", case.id,
+                          payload={"media": "audio", "status": audio_status}, success=False)
         except Exception as exc:
             self.emit("agent.tool_failed", "Report intake failed validation", tool_name="analyse_report", success=False,
                       payload={"error_type": type(exc).__name__})
-            raise ValueError("intake adapter could not produce a valid case") from exc
+            raise ValueError(f"{self.intake_adapter} intake adapter could not produce a valid case "
+                             f"({type(exc).__name__})") from exc
 
         if force_emergency:
             case.is_emergency = True
@@ -81,6 +119,30 @@ class HomeShieldService:
             self.emit("emergency.created", "Potential emergency requires immediate human safety review", case.id,
                       payload={"safety_notice": "Review immediately; HomeShield has not contacted emergency services"})
         return case, plan, approval
+
+    def _stored_media(self, reference: str | None, kind: str) -> StoredUpload | None:
+        if not reference:
+            return None
+        return self.upload_store.resolve(reference, kind)
+
+    def _normalise_evidence(self, case: Case, photo: StoredUpload | None, audio: StoredUpload | None,
+                            audio_status: str) -> None:
+        for media in (photo, audio):
+            if not media:
+                continue
+            if media.kind == "audio" and audio_status in {"stored_not_analysed", "stored_audio_rejected_by_adapter"}:
+                processing = "audio processing unavailable; recording was not analysed"
+            elif self.intake_adapter == "mock":
+                processing = "mock intake; media was not analysed"
+            else:
+                processing = "submitted to configured intake adapter"
+            description = f"{media.mime_type}, {media.size} bytes; {processing}"
+            evidence = next((item for item in case.evidence if item.kind == media.kind), None)
+            if evidence:
+                evidence.uri = media.reference
+                evidence.description = description
+            else:
+                case.evidence.append(Evidence(kind=media.kind, uri=media.reference, description=description))
 
     def _workers(self) -> list[Worker]:
         now = utc_now()

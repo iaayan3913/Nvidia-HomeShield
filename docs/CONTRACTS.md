@@ -8,11 +8,16 @@ The backend is authoritative. Consumers must tolerate new enum values and ignore
 
 Enums: `HazardType = damp_mould | leak | electrical | gas | fire | other`; `Severity = routine | moderate | significant | emergency`; `CaseStatus = new | investigating | awaiting_approval | scheduled | in_progress | resolved | escalated`; `Skill = general | damp_mould | plumbing | electrical | gas | fire`.
 
-Example report:
+Example JSON report (text-only, or using an opaque reference previously issued by this backend):
 
 ```json
-{"text":"Black mould in my child's bedroom","photo_uri":"upload://mould.jpg","property_id":"p-001"}
+{"text":"Black mould in my child's bedroom","property_id":"p-001"}
 ```
+
+`POST /api/reports` also accepts `multipart/form-data` fields `text`, optional `property_id`,
+optional binary `photo`, and optional binary `audio`. The backend returns and persists media as
+opaque `upload://<server-generated-id>.<validated-extension>` evidence references. Clients must
+not construct these references, submit filesystem paths, or submit external media URLs.
 
 ## API
 

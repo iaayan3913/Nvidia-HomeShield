@@ -7,12 +7,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
+from starlette.datastructures import UploadFile
 
 from agent.rules import compute_deadlines
 from agent.tools import TOOL_NAMES, TOOLS
 from backend.config import AGENT_RUNTIME, CORS_ORIGINS, DEMO_SEED, SCHEDULER_ADAPTER, USE_MOCKS
 from backend.schemas import ApprovalIn, Case, CasePatch, DecisionIn, EmergencyIn, ReportIn, StatusIn
 from backend.service import HomeShieldService
+from backend.uploads import UploadValidationError
 
 
 def create_app(service: HomeShieldService | None = None) -> FastAPI:
@@ -34,15 +37,69 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
         return {"status": "ok", "mocks": USE_MOCKS, "database": "sqlite",
                 "scheduler": SCHEDULER_ADAPTER, "agent_runtime": AGENT_RUNTIME}
 
-    @api.post("/api/reports", status_code=201)
-    def create_report(report: ReportIn):
+    def report_response(report: ReportIn):
         try:
             case, plan, approval = backend.submit_report(report)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
         except RuntimeError as exc:
             raise HTTPException(503, str(exc)) from exc
-        return {"case": case, "plan": plan, "approval": approval}
+        warnings = [item.description for item in case.evidence
+                    if item.description and "not analysed" in item.description]
+        return {"case": case, "plan": plan, "approval": approval, "warnings": warnings}
+
+    @api.post("/api/reports", status_code=201, openapi_extra={"requestBody": {"content": {
+        "application/json": {"schema": ReportIn.model_json_schema()},
+        "multipart/form-data": {"schema": {"type": "object", "required": ["text"], "properties": {
+            "text": {"type": "string"}, "property_id": {"type": "string"},
+            "photo": {"type": "string", "format": "binary"},
+            "audio": {"type": "string", "format": "binary"}}}}}}})
+    async def create_report(request: Request):
+        content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        if content_type == "application/json":
+            try:
+                report = ReportIn.model_validate(await request.json())
+            except (ValueError, ValidationError, json.JSONDecodeError) as exc:
+                raise HTTPException(422, "Invalid JSON report") from exc
+            return report_response(report)
+        if content_type != "multipart/form-data":
+            raise HTTPException(415, "Use application/json or multipart/form-data")
+
+        try:
+            form = await request.form()
+        except Exception as exc:
+            raise HTTPException(400, "Invalid multipart request") from exc
+        photo = form.get("photo")
+        audio = form.get("audio")
+        if photo is not None and not isinstance(photo, UploadFile):
+            raise HTTPException(422, "photo must be an uploaded file")
+        if audio is not None and not isinstance(audio, UploadFile):
+            raise HTTPException(422, "audio must be an uploaded file")
+
+        saved: list[str] = []
+        try:
+            photo_ref = None
+            audio_ref = None
+            if photo:
+                stored_photo = await backend.upload_store.save(photo, "photo")
+                photo_ref = stored_photo.reference
+                saved.append(photo_ref)
+            if audio:
+                stored_audio = await backend.upload_store.save(audio, "audio")
+                audio_ref = stored_audio.reference
+                saved.append(audio_ref)
+            report = ReportIn(text=str(form.get("text") or ""),
+                              property_id=str(form["property_id"]) if form.get("property_id") else None,
+                              photo_uri=photo_ref, audio_uri=audio_ref)
+        except UploadValidationError as exc:
+            for reference in saved:
+                backend.upload_store.discard(reference)
+            raise HTTPException(exc.status_code, str(exc)) from exc
+        except ValidationError as exc:
+            for reference in saved:
+                backend.upload_store.discard(reference)
+            raise HTTPException(422, "Invalid multipart report fields") from exc
+        return report_response(report)
 
     @api.post("/api/emergency", status_code=201)
     def create_emergency(report: EmergencyIn):
