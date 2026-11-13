@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, ClipboardList, ClipboardPenLine, LoaderCircle, RotateCcw, Send } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
-import { mockService, useDemoState, type Case, type CreateReportInput, type Property } from '../../shared/mock';
+import { homeShieldService, isApiMode, useDemoState, type Case, type CreateReportInput, type Property } from '../../shared/data';
 import { useNotifications } from '../../shared/notifications/NotificationProvider';
 import { Confirmation } from './components/Confirmation';
 import { DETAILS_FIELD_IDS, DetailsStep } from './components/DetailsStep';
@@ -39,9 +39,9 @@ export function ResidentPortal() {
 
   return <div className="rp-page">
     <header className="rp-hero">
-      <span className="eyebrow">Resident portal · demonstration</span>
+      <span className="eyebrow">Resident portal · {isApiMode ? 'connected to FastAPI' : 'demonstration'}</span>
       <h1>{view === 'track' ? 'Check on a repair report' : 'Report a problem with your home'}</h1>
-      <p>{view === 'track' ? 'See where your report has got to in the simulated repairs workflow.' : 'Tell us what is wrong in four short steps. It usually takes about three minutes.'}</p>
+      <p>{view === 'track' ? `See where your report has got to in the ${isApiMode ? 'connected' : 'simulated'} repairs workflow.` : 'Tell us what is wrong in four short steps. It usually takes about three minutes.'}</p>
       <EmergencyStrip />
     </header>
 
@@ -60,7 +60,7 @@ export function ResidentPortal() {
         <SafetyPanel />
         <section className="rp-aside-note" aria-labelledby="rp-demo-title">
           <h2 id="rp-demo-title">About this demonstration</h2>
-          <p>HomeShield is a prototype. Properties, people and reports are fictional. Triage and scheduling are simulated by fixed rules, not an official assessment, and nothing reaches a real landlord.</p>
+          <p>{isApiMode ? 'HomeShield is a prototype connected to FastAPI. Property choices remain synthetic, automated triage is provisional, and contact details are not yet stored by the backend.' : 'HomeShield is a prototype. Properties, people and reports are fictional. Triage and scheduling are simulated by fixed rules, not an official assessment, and nothing reaches a real landlord.'}</p>
         </section>
       </aside>
     </div>
@@ -144,10 +144,11 @@ function ReportFlow({ onSubmitted, onTrack }: { onSubmitted: (reference: string)
     submittingRef.current = true; setSubmitting(true); setSubmitError(null);
     try {
       await new Promise((resolve) => window.setTimeout(resolve, SUBMIT_DELAY_MS));
-      const result = mockService.createReport(input);
+      const result = await homeShieldService.createReport(input, { photos: photos.photos.map((item) => item.file), audio: recorder.notes[0]?.blob ?? null, audioName: recorder.notes[0] ? `voice-note.${recorder.notes[0].mimeType.includes('ogg') ? 'ogg' : 'webm'}` : undefined });
       setSubmitted({ created: result.case, property: properties.find((item) => item.id === draft.propertyId), category, preferredContact: draft.preferredContact });
       onSubmitted(result.case.id);
-      notify({ kind: 'success', title: 'Report sent', message: `Reference ${result.case.id} (simulated).` });
+      notify({ kind: 'success', title: 'Report sent', message: `Reference ${result.case.id}${isApiMode ? ' was stored by FastAPI.' : ' (simulated).'}` });
+      if (result.warnings.length) notify({ kind: 'warning', title: 'Media processing notice', message: result.warnings.join(' ') });
       photos.clear(); recorder.clear(); resetDraft();
       setDraft(emptyDraft()); setStep(0); setFurthest(0); setErrors({});
     } catch (cause) {
@@ -178,9 +179,9 @@ function ReportFlow({ onSubmitted, onTrack }: { onSubmitted: (reference: string)
     <ErrorSummary ref={summaryRef} errors={errors} fieldIds={FIELD_IDS} />
 
     {step === 0 ? <ProblemStep draft={draft} errors={errors} update={update} /> : null}
-    {step === 1 ? <EvidenceStep photos={photos} recorder={recorder} errors={errors} hasDescription={Boolean(draft.description.trim())} /> : null}
-    {step === 2 ? <DetailsStep draft={draft} errors={errors} update={update} properties={properties} /> : null}
-    {step === 3 ? <ReviewStep draft={draft} property={property} photos={photos.photos} notes={recorder.notes} onEdit={goTo} /> : null}
+    {step === 1 ? <EvidenceStep photos={photos} recorder={recorder} errors={errors} hasDescription={Boolean(draft.description.trim())} live={isApiMode} /> : null}
+    {step === 2 ? <DetailsStep draft={draft} errors={errors} update={update} properties={properties} live={isApiMode} /> : null}
+    {step === 3 ? <ReviewStep draft={draft} property={property} photos={photos.photos} notes={recorder.notes} onEdit={goTo} live={isApiMode} /> : null}
 
     {submitError ? <div className="rp-callout rp-callout--danger" role="alert"><div><strong>Your report was not sent</strong><p>{submitError} Your answers are still here. Please try again.</p></div></div> : null}
 

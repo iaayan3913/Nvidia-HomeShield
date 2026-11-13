@@ -62,7 +62,7 @@ describe('Operations portal', () => {
     const inspector = screen.getByRole('region', { name: 'HS-26043' });
 
     fireEvent.click(within(inspector).getByRole('button', { name: 'Create schedule proposal' }));
-    const approve = screen.getByRole('button', { name: 'Approve and activate' });
+    const approve = await screen.findByRole('button', { name: 'Approve and activate' });
     expect(approve).toBeDisabled();
     expect(screen.getByText('Not carried into this proposal')).toBeInTheDocument();
     const firstProposal = mockService.getState().proposals[0]!.id;
@@ -74,10 +74,10 @@ describe('Operations portal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reject proposal' }));
     expect(mockService.getState().active_plan?.id).toBe('plan-base');
     expect(mockService.getState().approvals.find((a) => a.plan_id === firstProposal)?.status).toBe('rejected');
-    expect(screen.getByText(/rejected. The active plan is unchanged/)).toBeInTheDocument();
+    expect(await screen.findByText(/rejected. The active plan is unchanged/)).toBeInTheDocument();
 
     fireEvent.click(within(screen.getByRole('region', { name: 'HS-26043' })).getByRole('button', { name: 'Create schedule proposal' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /I have reviewed/ }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /I have reviewed/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Approve and activate' }));
     const state = mockService.getState();
     expect(state.active_plan?.id).not.toBe('plan-base');
@@ -92,7 +92,7 @@ describe('Operations portal', () => {
     const dialog = screen.getByRole('dialog', { name: 'Simulate an emergency?' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Simulate emergency' }));
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('region', { name: 'HS-EMERGENCY-1' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'HS-EMERGENCY-1' })).toBeInTheDocument();
     expect(within(screen.getByLabelText('Operational summary')).getByText('Emergencies').nextElementSibling).toHaveTextContent('1');
     expect(screen.getByLabelText('Proposed plan')).toHaveTextContent('plan-emergency-replan');
     expect(mockService.getState().active_plan?.id).toBe('plan-base');

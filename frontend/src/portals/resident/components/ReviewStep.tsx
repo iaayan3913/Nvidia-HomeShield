@@ -4,7 +4,7 @@ import { CONTACT_METHODS, categoryById, type ReportDraft, type StepIndex } from 
 import type { PhotoItem, VoiceNote } from '../useEvidence';
 import { PhotoThumb, VoiceClip } from './EvidenceStep';
 
-export function ReviewStep({ draft, property, photos, notes, onEdit }: { draft: ReportDraft; property?: Property; photos: PhotoItem[]; notes: VoiceNote[]; onEdit: (step: StepIndex) => void }) {
+export function ReviewStep({ draft, property, photos, notes, onEdit, live = false }: { draft: ReportDraft; property?: Property; photos: PhotoItem[]; notes: VoiceNote[]; onEdit: (step: StepIndex) => void; live?: boolean }) {
   const category = categoryById(draft.category);
   const contact = CONTACT_METHODS.find((item) => item.id === draft.preferredContact)?.label;
   return <div className="rp-step-body">
@@ -29,7 +29,7 @@ export function ReviewStep({ draft, property, photos, notes, onEdit }: { draft: 
       <Row label="Access notes">{draft.accessNotes.trim() || 'None'}</Row>
     </ReviewSection>
 
-    <p className="rp-demo-note">By submitting, a simulated report and case are created in this demonstration. A housing officer would review it; nothing is sent to a real landlord or repairs service.</p>
+    <p className="rp-demo-note">{live ? 'By submitting, the fictional report is sent to FastAPI and may create a persisted case and schedule proposal. Contact fields are not included in the current backend contract.' : 'By submitting, a simulated report and case are created in this demonstration. A housing officer would review it; nothing is sent to a real landlord or repairs service.'}</p>
   </div>;
 }
 

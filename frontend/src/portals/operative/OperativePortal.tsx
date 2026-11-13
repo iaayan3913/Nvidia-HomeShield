@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarClock, CheckCircle2, ChevronDown, Inbox, Route, Wifi, WifiOff, X } from 'lucide-react';
 import { Select } from '../../shared/components/FormControls';
-import { mockService, useDemoState } from '../../shared/mock';
+import { homeShieldService, isApiMode, useConnectionState, useDemoState } from '../../shared/data';
 import type { DemoState } from '../../shared/types/domain';
 import { JobCard, JobStatusTag, PriorityTag } from './JobCard';
 import { RoutePreview } from './RoutePreview';
@@ -17,6 +17,7 @@ const caseRef = (state: DemoState, jobId: string) => state.jobs.find((j) => j.id
 
 export function OperativePortal() {
   const state = useDemoState();
+  const connection = useConnectionState();
   const online = useOnline();
   const [params, setParams] = useSearchParams();
   const requested = params.get('worker');
@@ -42,7 +43,7 @@ export function OperativePortal() {
     seen.current = { worker: worker?.id, plan: planId, jobs };
     if (previous.worker !== worker?.id) { setChange(null); return; }
     if (previous.plan === planId) return;
-    const latest = mockService.getState();
+    const latest = homeShieldService.getState();
     const approval = latest.approvals.find((a) => a.plan_id === planId && a.status === 'approved');
     if (!approval) return; // e.g. a demo reset restores the base plan without an officer decision
     const added = jobs.filter((id) => !previous.jobs.includes(id)).map((id) => caseRef(latest, id));
@@ -58,12 +59,12 @@ export function OperativePortal() {
     <section className="op-identity" aria-labelledby="op-title">
       <div className="op-identity__top">
         <div>
-          <span className="eyebrow">Operative · demonstration user</span>
+          <span className="eyebrow">Operative · {isApiMode ? 'FastAPI assignments' : 'demonstration user'}</span>
           <h1 id="op-title">{worker ? worker.name : 'Choose an operative'}</h1>
         </div>
         <span className="op-connection" data-online={online} role="status">
           {online ? <Wifi size={16} aria-hidden="true" /> : <WifiOff size={16} aria-hidden="true" />}
-          {online ? 'Live demo updates' : 'Offline · changes save on this device'}
+          {isApiMode ? (connection.status === 'connected' ? 'Live backend updates' : 'Backend unavailable') : (online ? 'Live demo updates' : 'Offline · changes save on this device')}
         </span>
       </div>
       <Select label="Viewing as (demonstration user)" value={worker?.id ?? ''} onChange={(e) => { setParams({ worker: e.target.value }, { replace: true }); }}>
@@ -77,6 +78,7 @@ export function OperativePortal() {
         <div className="op-identity__skills"><dt>Skills</dt><dd><ul aria-label="Skills">{worker.skills.map((s) => <li key={s}>{humanise(s)}</li>)}</ul></dd></div>
       </dl>}
     </section>
+    {isApiMode ? <p className="op-replan-note" role="note">Assignments come from the approved FastAPI plan. Job progress controls are local demonstration-only because the backend has no operative progress endpoint yet.</p> : null}
 
     {change && <div className="op-change" role="alert">
       <Route size={20} aria-hidden="true" />

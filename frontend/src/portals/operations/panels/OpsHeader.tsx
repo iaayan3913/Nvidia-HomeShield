@@ -14,9 +14,10 @@ interface Props {
   emergencyExists: boolean;
   onEmergency(): void;
   onReset(): void;
+  live?: boolean;
 }
 
-export const OpsHeader = memo(function OpsHeader({ summary, online, railOpen, onToggleRail, drawerTab, onOpenDrawer, pendingCount, emergencyExists, onEmergency, onReset }: Props) {
+export const OpsHeader = memo(function OpsHeader({ summary, online, railOpen, onToggleRail, drawerTab, onOpenDrawer, pendingCount, emergencyExists, onEmergency, onReset, live }: Props) {
   return <header className="ops-header">
     <div className="ops-header__title">
       <h1>Sheffield operations</h1>
@@ -37,7 +38,7 @@ export const OpsHeader = memo(function OpsHeader({ summary, online, railOpen, on
       <button type="button" className={`button ${emergencyExists ? 'button--secondary' : 'button--danger'} ops-emergency-button`} onClick={onEmergency}>
         <Siren size={17} aria-hidden="true" /><span>{emergencyExists ? 'Review emergency' : 'Simulate emergency'}</span>
       </button>
-      <button type="button" className="ops-tool-button" onClick={onReset}><RotateCcw size={17} aria-hidden="true" /><span>Reset demo</span></button>
+      <button type="button" className="ops-tool-button" onClick={onReset}><RotateCcw size={17} aria-hidden="true" /><span>{live?'Use demo':'Reset demo'}</span></button>
     </div>
   </header>;
 });

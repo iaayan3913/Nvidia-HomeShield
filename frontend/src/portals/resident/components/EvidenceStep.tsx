@@ -27,7 +27,7 @@ export function VoiceClip({ note, index, onRemove }: { note: VoiceNote; index: n
   </li>;
 }
 
-export function EvidenceStep({ photos, recorder, errors, hasDescription }: { photos: Photos; recorder: Recorder; errors: FieldErrors; hasDescription: boolean }) {
+export function EvidenceStep({ photos, recorder, errors, hasDescription, live = false }: { photos: Photos; recorder: Recorder; errors: FieldErrors; hasDescription: boolean; live?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const full = photos.photos.length >= MAX_PHOTOS;
   const voiceFull = recorder.notes.length >= MAX_VOICE_NOTES;
@@ -65,7 +65,7 @@ export function EvidenceStep({ photos, recorder, errors, hasDescription }: { pho
         : null}
     </section>
 
-    <p className="rp-privacy-note">Photos and recordings stay in this browser tab while you complete the report. In this demonstration they are never uploaded or saved; only a short description of each item is recorded.</p>
+    <p className="rp-privacy-note">Photos and recordings stay in this browser tab while you complete the report. {live ? 'When you submit, the first photo and first voice note are uploaded to FastAPI; additional items are not uploaded.' : 'In this demonstration they are never uploaded or saved; only a short description of each item is recorded.'}</p>
   </div>;
 }
 

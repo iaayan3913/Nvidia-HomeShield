@@ -24,7 +24,7 @@ export function Confirmation({ created, property, category, preferredContact, on
     <div className="rp-confirm-head">
       <CircleCheck size={32} aria-hidden="true" className="rp-confirm-icon" />
       <h2 id="rp-confirm-title" ref={headingRef} tabIndex={-1}>Your repair report has been sent</h2>
-      <p>This is a demonstration: a simulated report and case were created in this browser.</p>
+      <p>{created.simulated ? 'This is a demonstration: a simulated report and case were created in this browser.' : 'FastAPI stored your report and returned this case reference. Contact details shown in the form are not currently persisted by the backend.'}</p>
     </div>
 
     <div className="rp-reference">
@@ -36,7 +36,7 @@ export function Confirmation({ created, property, category, preferredContact, on
     <div className={`rp-callout ${urgent ? 'rp-callout--warning' : 'rp-callout--info'}`} role="status">
       {urgent ? <CircleAlert size={20} aria-hidden="true" /> : <Info size={20} aria-hidden="true" />}
       <div>
-        <strong>{urgent ? 'Simulated triage: flagged for urgent human attention' : 'Simulated triage: routine officer review'}</strong>
+        <strong>{urgent ? `${created.simulated ? 'Simulated triage' : 'Provisional triage'}: flagged for urgent human attention` : `${created.simulated ? 'Simulated triage' : 'Provisional triage'}: routine officer review`}</strong>
         <p>{urgent
           ? 'The demonstration’s automatic rules suggest this may need prompt attention, so it has been highlighted for a housing officer. A person decides the actual urgency.'
           : 'The demonstration’s automatic rules did not flag this as urgent. A housing officer still reviews every report and decides the actual priority.'}</p>

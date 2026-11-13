@@ -5,10 +5,10 @@ import { CONTACT_METHODS, type FieldErrors, type ReportDraft } from '../model';
 
 export const DETAILS_FIELD_IDS = { propertyId: 'rp-property', name: 'rp-name', phone: 'rp-phone', preferredContact: `rp-contact-${CONTACT_METHODS[0]!.id}` } as const;
 
-export function DetailsStep({ draft, errors, update, properties }: { draft: ReportDraft; errors: FieldErrors; update: (patch: Partial<ReportDraft>) => void; properties: Property[] }) {
+export function DetailsStep({ draft, errors, update, properties, live = false }: { draft: ReportDraft; errors: FieldErrors; update: (patch: Partial<ReportDraft>) => void; properties: Property[]; live?: boolean }) {
   const property = properties.find((item) => item.id === draft.propertyId);
   return <div className="rp-step-body">
-    <p className="rp-demo-note"><strong>Demonstration only.</strong> Every property here is fictional. Please use made-up details: they are kept only in this demo’s simulated records in your browser.</p>
+    <p className="rp-demo-note"><strong>Demonstration only.</strong> Every property here is fictional. Please use made-up details. {live ? 'The current FastAPI report contract does not receive or store the contact fields.' : 'They are kept only in this demo’s simulated records in your browser.'}</p>
 
     <section className="rp-subsection" aria-labelledby="rp-home-title">
       <h3 id="rp-home-title">Your home</h3>

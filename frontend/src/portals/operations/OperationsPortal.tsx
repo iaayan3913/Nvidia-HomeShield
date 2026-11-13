@@ -1,6 +1,6 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Loader2, MapPinOff, PanelLeftOpen, RotateCcw, Siren } from 'lucide-react';
-import { mockService, useDemoState } from '../../shared/mock';
+import { homeShieldService, isApiMode, switchDataSource, useConnectionState, useDemoState } from '../../shared/data';
 import { useNotifications } from '../../shared/notifications/NotificationProvider';
 import type { SchedulePlan } from '../../shared/types/domain';
 import {
@@ -36,6 +36,7 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
 
 export function OperationsPortal() {
   const state = useDemoState();
+  const connection = useConnectionState();
   const { notify } = useNotifications();
   const isDesktop = useIsDesktop();
   const isWide = useIsWide();
@@ -117,7 +118,7 @@ export function OperationsPortal() {
 
   const requestFocus = useCallback((position: LonLat) => setFocus((prev) => ({ key: (prev?.key ?? 0) + 1, position })), []);
   const selectCase = useCallback((caseId: string, moveCamera = true) => {
-    const current = mockService.getState();
+    const current = homeShieldService.getState();
     const item = current.cases.find((c) => c.id === caseId);
     if (!item) return;
     setSelection({ kind: 'case', id: caseId });
@@ -170,11 +171,11 @@ export function OperationsPortal() {
   const showDrawer = useCallback((tab: DrawerTab) => setDrawer((d) => ({ ...d, open: true, tab })), []);
 
   /* ---------------------------------------------------------- workflow actions */
-  const createProposal = useCallback((caseId: string) => {
+  const createProposal = useCallback(async (caseId: string) => {
     setBusy(true);
     try {
-      mockService.recordActivity({ case_id: caseId, type: 'schedule.requested', summary: `Housing officer requested a deterministic schedule proposal for ${caseId}`, tool_name: 'mock-deterministic' });
-      const plan = mockService.generateScheduleProposal(caseId);
+      homeShieldService.recordActivity({ case_id: caseId, type: 'schedule.requested', summary: `Housing officer requested a schedule proposal for ${caseId}`, tool_name: isApiMode ? 'backend' : 'mock-deterministic' });
+      const plan = await homeShieldService.generateScheduleProposal(caseId);
       setReviewPlanId(plan.id); showDrawer('schedule');
       setMessage({ tone: 'info', text: `Proposal ${plan.id} is ready for review. Routes and assignments stay unchanged until you approve it.` });
     } catch (error) {
@@ -184,23 +185,24 @@ export function OperationsPortal() {
 
   const reviewProposal = useCallback((planId: string) => { setReviewPlanId(planId); showDrawer('schedule'); }, [showDrawer]);
 
-  const approve = useCallback((planId: string) => {
+  const approve = useCallback(async (planId: string) => {
     setBusy(true);
     try {
-      const plan = mockService.approveProposal(planId, 'demo-officer');
+      const decidedBy = isApiMode ? 'frontend-officer' : 'demo-officer';
+      const plan = await homeShieldService.approveProposal(planId, decidedBy);
       const visits = plan.workers.reduce((sum, route) => sum + route.stops.length, 0);
       setReviewPlanId(null);
       setMessage({ tone: 'success', text: `Approved. Plan ${plan.id} is now active with ${visits} operative ${visits === 1 ? 'assignment' : 'assignments'}.` });
-      notify({ kind: 'success', title: 'Plan activated', message: `${plan.id} approved by demo-officer. Operative assignments updated.` });
+      notify({ kind: 'success', title: 'Plan activated', message: `${plan.id} approved by ${decidedBy}. Operative assignments updated.` });
     } catch (error) {
       setMessage({ tone: 'error', text: `Approval failed; the previous plan is still active. ${errorText(error)}` });
     } finally { setBusy(false); }
   }, [notify]);
 
-  const reject = useCallback((planId: string, reason: string) => {
+  const reject = useCallback(async (planId: string, reason: string) => {
     setBusy(true);
     try {
-      mockService.rejectProposal(planId, reason, 'demo-officer');
+      await homeShieldService.rejectProposal(planId, reason, isApiMode ? 'frontend-officer' : 'demo-officer');
       setReviewPlanId(null);
       setMessage({ tone: 'info', text: `Proposal ${planId} rejected. The active plan is unchanged.` });
     } catch (error) {
@@ -208,41 +210,42 @@ export function OperationsPortal() {
     } finally { setBusy(false); }
   }, []);
 
-  const emergencyExists = state.cases.some((c) => c.id === EMERGENCY_CASE_ID);
+  const emergencyExists = state.cases.some((c) => isApiMode ? c.is_emergency : c.id === EMERGENCY_CASE_ID);
   const emergencyLock = useRef(false);
-  const focusEmergency = useCallback((planId: string | null) => {
+  const focusEmergency = useCallback((planId: string | null, caseId = EMERGENCY_CASE_ID) => {
     setFilters(DEFAULT_FILTERS);
-    selectCase(EMERGENCY_CASE_ID);
+    selectCase(caseId);
     if (planId) setReviewPlanId(planId);
     setTimelineScope('all');
     showDrawer('schedule');
   }, [selectCase, showDrawer]);
 
-  const runEmergency = useCallback(() => {
+  const runEmergency = useCallback(async () => {
     setDialog(null);
     if (emergencyLock.current) return;
     emergencyLock.current = true;
     try {
-      const { proposal } = mockService.simulateEmergency(); // called once; the button changes to “Review emergency” afterwards
-      ownCases.current.add(EMERGENCY_CASE_ID);
-      focusEmergency(proposal.id);
-      setMessage({ tone: 'info', text: `Simulated emergency ${EMERGENCY_CASE_ID} created with re-plan ${proposal.id}. The active route is unchanged until you approve.` });
+      const { case: emergencyCase, proposal } = await homeShieldService.simulateEmergency();
+      ownCases.current.add(emergencyCase.id);
+      if (proposal) focusEmergency(proposal.id, emergencyCase.id); else { selectCase(emergencyCase.id); showDrawer('schedule'); }
+      setMessage({ tone: proposal ? 'info' : 'error', text: proposal ? `Emergency ${emergencyCase.id} created with re-plan ${proposal.id}. The active route is unchanged until you approve.` : `Emergency ${emergencyCase.id} was stored, but scheduling did not produce a plan. Review backend activity before retrying.` });
     } catch (error) {
       setMessage({ tone: 'error', text: `Emergency simulation failed: ${errorText(error)}` }); showDrawer('schedule');
     } finally { emergencyLock.current = false; }
-  }, [focusEmergency, showDrawer]);
+  }, [focusEmergency, selectCase, showDrawer]);
 
   const onEmergencyButton = useCallback(() => {
-    if (mockService.getState().cases.some((c) => c.id === EMERGENCY_CASE_ID)) {
-      const replan = pendingProposals(mockService.getState()).find((p) => p.kind === 'replan');
-      focusEmergency(replan?.id ?? null);
+    const current=homeShieldService.getState(); const existing=current.cases.find((c)=>isApiMode?c.is_emergency:c.id===EMERGENCY_CASE_ID);
+    if (existing) {
+      const replan = pendingProposals(homeShieldService.getState()).find((p) => p.kind === 'replan');
+      if(isApiMode){selectCase(existing.id);if(replan)setReviewPlanId(replan.id);showDrawer('schedule');}else focusEmergency(replan?.id ?? null);
     } else setDialog('emergency');
-  }, [focusEmergency]);
+  }, [focusEmergency, selectCase, showDrawer]);
 
   const runReset = useCallback(() => {
     setDialog(null);
     knownCases.current = null; ownCases.current.clear();
-    mockService.reset();
+    try { homeShieldService.reset(); } catch (error) { setMessage({ tone: 'error', text: errorText(error) }); return; }
     setSelection(null); setFilters(DEFAULT_FILTERS); setReviewPlanId(null); setMessage(null); setArrivals([]);
     setDrawer({ open: false, tab: 'schedule', expanded: false }); setLayers(DEFAULT_LAYERS); setTimelineScope('all');
     setRailOpen(isDesktop); setResetKey((k) => k + 1);
@@ -280,7 +283,7 @@ export function OperationsPortal() {
   }, [notify]);
 
   return <div className="ops" ref={rootRef} style={style}>
-    <OpsHeader summary={summary} online={online} railOpen={railOpen} onToggleRail={() => setRailOpen((v) => !v)} drawerTab={drawer.open ? drawer.tab : null} onOpenDrawer={openDrawer} pendingCount={pending.length} emergencyExists={emergencyExists} onEmergency={onEmergencyButton} onReset={() => setDialog('reset')} />
+    <OpsHeader summary={summary} online={isApiMode ? connection.status === 'connected' : online} railOpen={railOpen} onToggleRail={() => setRailOpen((v) => !v)} drawerTab={drawer.open ? drawer.tab : null} onOpenDrawer={openDrawer} pendingCount={pending.length} emergencyExists={emergencyExists} onEmergency={onEmergencyButton} onReset={() => isApiMode ? switchDataSource('mock') : setDialog('reset')} live={isApiMode} />
 
     <div className="ops-workspace" data-rail={railOpen || undefined} data-inspector={Boolean(inspectorTarget) || undefined} data-drawer={drawer.open || undefined}>
       <div className="ops-map" role="region" aria-label="Sheffield digital twin">

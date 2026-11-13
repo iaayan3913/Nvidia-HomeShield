@@ -30,10 +30,13 @@ class PythonToolAgent:
     client: AgentLLMClient | None = None
     use_model: bool = AGENT_RUNTIME == "python" and not USE_MOCKS
 
+    def _deterministic_actions(self, case_id: str) -> list[tuple[str, dict]]:
+        return [("compute_deadlines", {"case_id": case_id}),
+                ("schedule_job", {"case_id": case_id}),
+                ("request_approval", {"case_id": case_id, "action": "commit_plan"})]
+
     def _actions(self, case_id: str) -> list[tuple[str, dict]]:
-        deterministic = [("compute_deadlines", {"case_id": case_id}),
-                         ("schedule_job", {"case_id": case_id}),
-                         ("request_approval", {"case_id": case_id, "action": "commit_plan"})]
+        deterministic = self._deterministic_actions(case_id)
         if not self.use_model:
             return deterministic
         client = self.client or AgentLLMClient()
@@ -63,6 +66,11 @@ class PythonToolAgent:
             actions.append((item["name"], arguments))
         if not actions:
             raise LLMError("Agent model returned no permitted actions")
+        critical = [name for name, _ in actions if name in {
+            "compute_deadlines", "schedule_job", "request_approval"
+        }]
+        if critical != ["compute_deadlines", "schedule_job", "request_approval"]:
+            raise LLMError("Agent model returned an incomplete or unsafe tool sequence")
         return actions[:self.max_iterations]
 
     def run(self, case_id: str) -> list[dict]:
@@ -70,9 +78,13 @@ class PythonToolAgent:
         try:
             actions = self._actions(case_id)
         except LLMError as exc:
-            return [{"tool": "agent_reasoning", "success": False,
-                     "summary": f"Agent reasoning model unavailable ({type(exc).__name__})"}]
-        results: list[dict] = []
+            actions = self._deterministic_actions(case_id)
+            results: list[dict] = [{
+                "tool": "agent_reasoning", "success": False,
+                "summary": f"Agent reasoning model unavailable ({type(exc).__name__}); deterministic fallback used"
+            }]
+        else:
+            results = []
         for iteration, (name, arguments) in enumerate(actions):
             if iteration >= self.max_iterations:
                 results.append({"tool": name, "success": False, "summary": "Agent iteration limit reached"})
@@ -89,6 +101,10 @@ class PythonToolAgent:
             except Exception as exc:
                 results.append({"tool": name, "success": False,
                                 "summary": f"Tool failed ({type(exc).__name__})"})
+                if name in {"compute_deadlines", "schedule_job"}:
+                    # Never request approval when the prerequisite compliance
+                    # or scheduling action did not complete successfully.
+                    break
         return results
 
 

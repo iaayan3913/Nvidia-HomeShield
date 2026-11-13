@@ -3,7 +3,7 @@ import { Check, MapPin, Search } from 'lucide-react';
 import { Button } from '../../../shared/components/Button';
 import { Input } from '../../../shared/components/FormControls';
 import { StatusBadge } from '../../../shared/components/Status';
-import { useDemoState } from '../../../shared/mock';
+import { isApiMode, useDemoState } from '../../../shared/data';
 import { JOB_STATUS, RESIDENT_STATUS, TIMELINE, formatDateTime, needsUrgentAttention, timelineIndex } from '../caseLabels';
 import { CATEGORIES } from '../model';
 
@@ -38,7 +38,7 @@ export function TrackReport({ initialReference, recentReferences, onReferenceCha
 
   return <section className="rp-track" aria-labelledby={titleId}>
     <h2 id={titleId}>Track a report</h2>
-    <p className="rp-lead">Enter the reference you were given when you sent your report. Progress updates live from the simulated workflow.</p>
+    <p className="rp-lead">Enter the reference you were given when you sent your report. Progress updates from the {isApiMode ? 'connected housing system' : 'simulated workflow'}.</p>
     <form className="rp-track-form" onSubmit={submit} noValidate>
       <Input label="Report reference" placeholder="HS-26043" value={query} error={error} autoCapitalize="characters" autoComplete="off" spellCheck={false}
         onChange={(event) => setQuery(event.target.value)} />
@@ -72,7 +72,7 @@ export function TrackReport({ initialReference, recentReferences, onReferenceCha
               <div><dt>Simulated triage</dt><dd>{needsUrgentAttention(found) ? 'Flagged for urgent human attention' : 'Routine officer review'}</dd></div>
               <div><dt>Last updated</dt><dd>{formatDateTime(found.updated_at)}</dd></div>
             </dl>
-            <p className="field-hint">All statuses are part of a simulated demonstration workflow and are not an official decision.</p>
+            <p className="field-hint">{isApiMode ? 'Statuses come from FastAPI. Automated triage still requires professional review.' : 'All statuses are part of a simulated demonstration workflow and are not an official decision.'}</p>
           </article>}
     </div>
   </section>;
