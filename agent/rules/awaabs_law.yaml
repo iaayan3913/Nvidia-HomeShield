@@ -1,0 +1,8 @@
+version: "VERIFY: official MHCLG guidance before demo"
+working_days_exclude: ["Saturday", "Sunday"]
+emergency:
+  investigate_hours: 24
+  make_safe_hours: 24
+significant:
+  investigate_working_days: 10
+  start_works_working_days_after_investigation: 5

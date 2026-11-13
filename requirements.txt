@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic>=2
+python-dotenv
+httpx
+openai
+pyyaml
+pytest
+# Optional on the Spark: cuopt, ortools, osmnx
