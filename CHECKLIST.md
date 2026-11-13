@@ -3,7 +3,7 @@
 | Role | Items | Done | % | Status |
 |---|---:|---:|---:|---|
 | Person 1 | 8 | 4 | 50% | started |
-| Person 2 | 7 | 0 | 0% | not started |
+| Person 2 | 7 | 5 | 71% | started |
 | Person 3 | 9 | 0 | 0% | not started |
 | Person 4 | 8 | 8 | 100% | done |
 | Person 5 | 9 | 0 | 0% | not started |
@@ -21,13 +21,13 @@
 
 ## Person 2 — Multimodal intake
 
-- [ ] **[Person 2 | 10:00-10:30]** Create `analyse_report()` accepting text/photo/audio; done when the mock returns a valid Case.
-- [ ] **[Person 2 | 10:30-11:15]** Connect shared Nano Omni API; done when one real request is parsed.
-- [ ] **[Person 2 | 11:15-11:45]** Validate structured JSON and null missing details; done when invalid output produces a clear error.
-- [ ] **[Person 2 | 11:45-12:15]** Test mould, leak and electrical reports; done when all three fixtures pass.
-- [ ] **[Person 2 | 12:15-12:45]** Add text-only fallback and helpful request errors; done when it works with `USE_MOCKS=true`.
-- [ ] **[Person 2 | 13:00 checkpoint]** Hand function to Person 3; done when API creates a case from the adapter.
-- [ ] **[Person 2 | 15:00 checkpoint]** Verify model path or freeze mock; done when demo input is reliable.
+- [x] **[Person 2 | 10:00-10:30]** Create `analyse_report()` accepting text/photo/audio; done when the mock returns a valid Case. _Note: `intake/agent.py` + `intake/mock.py`; mock returns a valid Case with photo/audio evidence._
+- [ ] **[Person 2 | 10:30-11:15]** Connect shared Nano Omni API; done when one real request is parsed. _Note: code ready in `intake/real.py`; waiting on Person 1 for model address + ID (`INTAKE_MODEL`)._
+- [x] **[Person 2 | 11:15-11:45]** Validate structured JSON and null missing details; done when invalid output produces a clear error. _Note: Pydantic-validated; unstated fields stay null; bad JSON raises `IntakeError`._
+- [x] **[Person 2 | 11:45-12:15]** Test mould, leak and electrical reports; done when all three fixtures pass. _Note: `intake/tests/test_intake.py` passes; demo photos + texts in `demo-photos/`._
+- [x] **[Person 2 | 12:15-12:45]** Add text-only fallback and helpful request errors; done when it works with `USE_MOCKS=true`. _Note: `INTAKE_ADAPTER=mock` works offline; model errors/timeouts give a clear message._
+- [x] **[Person 2 | 13:00 checkpoint]** Hand function to Person 3; done when API creates a case from the adapter. _Note: merged to main; backend upload tests run the real adapter end to end._
+- [ ] **[Person 2 | 15:00 checkpoint]** Verify model path or freeze mock; done when demo input is reliable. _Note: after Person 1's model is up: run the 3 demo photos through it, else freeze mock._
 
 ## Person 3 — Backend, compliance and orchestration
 
