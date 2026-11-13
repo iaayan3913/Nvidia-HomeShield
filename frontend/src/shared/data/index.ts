@@ -19,7 +19,7 @@ export const homeShieldService={
   retry:()=>isApiMode?apiService.retry():Promise.resolve(),
   getConnection:()=>isApiMode?apiService.getConnection():mockConnection,
   subscribeConnection:(fn:()=>void)=>isApiMode?apiService.subscribeConnection(fn):()=>{},
-  createReport:(input:CreateReportInput,media?:ReportMedia)=>isApiMode?apiService.createReport(input,media):Promise.resolve({...mockService.createReport(input),plan:null,approval:null,warnings:[]}),
+  createReport:async(input:CreateReportInput,media?:ReportMedia)=>isApiMode?apiService.createReport(input,media):({...await Promise.resolve(mockService.createReport(input)),plan:null,approval:null,warnings:[]}),
   generateScheduleProposal:(caseId?:string)=>isApiMode?apiService.generateScheduleProposal(caseId):Promise.resolve(mockService.generateScheduleProposal(caseId)),
   approveProposal:(planId:string,by?:string)=>isApiMode?apiService.approveProposal(planId,by):Promise.resolve(mockService.approveProposal(planId,by)),
   rejectProposal:(planId:string,reason:string,by?:string)=>isApiMode?apiService.rejectProposal(planId,reason,by):Promise.resolve(mockService.rejectProposal(planId,reason,by)),

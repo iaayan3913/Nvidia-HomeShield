@@ -47,7 +47,7 @@ export interface CreateReportInput {
   evidence?: Array<Omit<Evidence, 'uri'> & { uri?: never }>;
 }
 
-export interface ReportMedia { photos?: File[]; audio?: Blob | null; audioName?: string; }
+export interface ReportMedia { photos?: Blob[]; audio?: Blob | null; audioName?: string; }
 export interface ReportResult { case: Case; plan: SchedulePlan | null; approval: Approval | null; warnings: string[]; }
 export type DataSourceMode = 'mock' | 'api';
 export type ConnectionStatus = 'demo' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';

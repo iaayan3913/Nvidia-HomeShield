@@ -160,6 +160,7 @@ function ReportFlow({ onSubmitted, onTrack }: { onSubmitted: (reference: string)
       setSubmitted({ created: result.case, home: sentHome, category: sentCategory, preferredContact: sentContact });
       onSubmitted(result.case.id);
       notify({ kind: 'success', title: 'Report sent', message: `Your reference is ${result.case.id}.` });
+      if (result.warnings.length) notify({ kind: 'warning', title: 'Report received with a warning', message: result.warnings.join(' ') });
       photo.clear(); recorder.clear(); resetDraft();
       setDraft(emptyDraft()); setStep(0); setFurthest(0); setErrors({});
     } catch (cause) {
