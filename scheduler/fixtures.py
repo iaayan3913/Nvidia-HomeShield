@@ -59,11 +59,15 @@ def _raw(name: str) -> list[dict]:
 
 
 def load_workers(day: date | None = None) -> list[Worker]:
-    return [Worker(**_rebase(w, ("shift_start", "shift_end"), day)) for w in _raw("workers")]
+    allowed = set(Worker.model_fields)
+    return [Worker(**{k: v for k, v in _rebase(w, ("shift_start", "shift_end"), day).items() if k in allowed})
+            for w in _raw("workers")]
 
 
 def load_jobs(day: date | None = None) -> list[Job]:
-    return [Job(**_rebase(j, ("earliest", "latest"), day)) for j in _raw("jobs")]
+    allowed = set(Job.model_fields)
+    return [Job(**{k: v for k, v in _rebase(j, ("earliest", "latest"), day).items() if k in allowed})
+            for j in _raw("jobs")]
 
 
 @lru_cache(maxsize=1)
