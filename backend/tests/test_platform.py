@@ -143,4 +143,3 @@ def test_events_tail_returns_newest(tmp_path):
     every = client.get("/api/events").json()
     newest = client.get("/api/events", params={"tail": 2}).json()
     assert [e["sequence"] for e in newest] == [e["sequence"] for e in every[-2:]]
-
