@@ -23,6 +23,7 @@ Reply with ONE JSON object only, no prose, using exactly these keys:
  "is_emergency": true or false (immediate risk to health or safety, e.g. gas smell, exposed live wiring, fire, major flooding),
  "room": "room name or null",
  "vulnerable_occupants": only those the report actually mentions, from ["child", "elderly", "disabled", "pregnant", "respiratory_condition"], else [],
+ "health_symptoms": true if the report says someone is already suffering health effects from the hazard (e.g. coughing, wheezing, breathing problems), else false,
  "summary": "one neutral sentence describing the hazard"}
 Classify hazard_type by root cause: water coming in from pipes, roof or a neighbouring flat is "leak" even if it has caused damp or stains; use "damp_mould" for condensation and mould growth.
 Severity guide: emergency = immediate danger to life or safety; significant = a health risk, e.g. damp or mould where a child, elderly or ill person lives or sleeps, or a leak near electrics; moderate = needs repair but no direct health risk; routine = cosmetic.
@@ -69,8 +70,11 @@ def parse_case(raw: str, text: str, photo_uri: str | None = None, audio_uri: str
     if (fields.get("hazard_type") == "damp_mould" and fields.get("vulnerable_occupants")
             and fields.get("severity") in ("routine", "moderate")):
         fields["severity"] = "significant"  # the model wavers here; damp/mould with vulnerable occupants is a health risk
-    if fields.get("hazard_type") == "damp_mould" and "respiratory_condition" in (fields.get("vulnerable_occupants") or []):
-        fields["severity"] = "emergency"  # VERIFY: Awaab's Law guidance example - child's asthma worsened by bedroom mould
+    if fields.get("hazard_type") == "damp_mould" and (
+            "respiratory_condition" in (fields.get("vulnerable_occupants") or []) or data.get("health_symptoms") is True):
+        # VERIFY: Awaab's Law Phase 2 triage guidance - damp/mould is an emergency where the tenant is particularly
+        # vulnerable or already has symptoms (worked example: young child's asthma affected by bedroom mould)
+        fields["severity"] = "emergency"
     try:
         return Case(id=f"case-{uuid4().hex[:8]}", **fields, summary=data.get("summary") or text[:1000],
                     is_emergency=fields.get("severity") == "emergency",

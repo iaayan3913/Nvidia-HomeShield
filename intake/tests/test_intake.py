@@ -105,3 +105,15 @@ def test_mould_with_respiratory_condition_is_emergency_from_model():
     case = real.parse_case('{"hazard_type":"damp_mould","severity":"significant",'
                            '"vulnerable_occupants":["child","respiratory_condition"]}', ASTHMA)
     assert case.severity == Severity.emergency and case.is_emergency
+
+
+COUGH = "Black mould on my son's bedroom wall. He's 3 and has been coughing at night for two weeks."
+
+def test_mould_with_symptoms_is_emergency(monkeypatch):
+    monkeypatch.setattr(agent, "INTAKE_ADAPTER", "mock")
+    assert agent.analyse_report(COUGH).is_emergency
+    assert real.parse_case('{"hazard_type":"damp_mould","severity":"significant","vulnerable_occupants":["child"],'
+                           '"health_symptoms":true}', COUGH).is_emergency
+    # child but no symptoms or condition stays significant (guidance's non-emergency contrast)
+    assert not real.parse_case('{"hazard_type":"damp_mould","severity":"significant","vulnerable_occupants":["child"],'
+                               '"health_symptoms":false}', "r").is_emergency
