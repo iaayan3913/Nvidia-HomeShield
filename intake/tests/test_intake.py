@@ -60,3 +60,22 @@ def test_long_report_and_inline_thinking(monkeypatch):
     case = real.parse_case('<think>maybe {"hazard_type": "gas"}</think>{"hazard_type":"leak","severity":"moderate"}',
                            "x" * 5000)
     assert case.hazard_type == HazardType.leak and len(case.summary) == 1000
+
+
+@pytest.mark.parametrize("text,hazard,severity,room,vulnerable", [
+    ("Black mould spots on my bedroom wall and my 4-year-old sleeps in there.", "damp_mould", "significant", "bedroom", ["child"]),
+    ("The kitchen ceiling is peeling since the flat upstairs had a leak.", "leak", "moderate", "kitchen", []),
+    ("The socket in my living room burnt out, bare wires showing, children in the house.", "electrical", "emergency", "living room", ["child"]),
+])
+def test_mock_matches_demo_reports(monkeypatch, text, hazard, severity, room, vulnerable):
+    monkeypatch.setattr(agent, "INTAKE_ADAPTER", "mock")
+    case = agent.analyse_report(text)
+    assert (case.hazard_type.value, case.severity.value, case.room, case.vulnerable_occupants) == (hazard, severity, room, vulnerable)
+    assert case.is_emergency == (severity == "emergency")
+
+def test_model_output_is_normalised_and_emergency_is_consistent():
+    case = real.parse_case('{"hazard_type":" Leak ","severity":"Moderate","is_emergency":true,'
+                           '"vulnerable_occupants":"elderly"}', "report")
+    assert case.hazard_type == HazardType.leak and case.vulnerable_occupants == ["elderly"]
+    assert case.severity == Severity.emergency and case.is_emergency
+    assert not real.parse_case('{"hazard_type":"leak","severity":"moderate","is_emergency":false}', "r").is_emergency

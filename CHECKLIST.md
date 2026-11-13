@@ -25,7 +25,7 @@
 - [x] **[Person 2 | 10:30-11:15]** Connect shared Nano Omni API; done when one real request is parsed. _Note: verified with hosted Nano Omni (`nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`, `.env.hosted`): mould/leak/socket photos all correct, 8-13s each, and a photo upload through the API works. Spark endpoint still pending from Person 1._
 - [x] **[Person 2 | 11:15-11:45]** Validate structured JSON and null missing details; done when invalid output produces a clear error. _Note: Pydantic-validated; unstated fields stay null; bad JSON raises `IntakeError`._
 - [x] **[Person 2 | 11:45-12:15]** Test mould, leak and electrical reports; done when all three fixtures pass. _Note: `intake/tests/test_intake.py` passes; demo photos + texts in `demo-photos/`._
-- [x] **[Person 2 | 12:15-12:45]** Add text-only fallback and helpful request errors; done when it works with `USE_MOCKS=true`. _Note: `INTAKE_ADAPTER=mock` works offline; model errors/timeouts give a clear message._
+- [x] **[Person 2 | 12:15-12:45]** Add text-only fallback and helpful request errors; done when it works with `USE_MOCKS=true`. _Note: `INTAKE_ADAPTER=mock` works offline and gives the same hazard/severity/room/child result as the real model on all 3 demo reports; model errors/timeouts give a clear message._
 - [x] **[Person 2 | 13:00 checkpoint]** Hand function to Person 3; done when API creates a case from the adapter. _Note: merged to main; backend upload tests run the real adapter end to end._
 - [ ] **[Person 2 | 15:00 checkpoint]** Verify model path or freeze mock; done when demo input is reliable. _Note: hosted model passes all 3 demo photos; decide at 15:00 between Spark, hosted, or mock (`py -3.13 -m intake.try_live`)._
 
