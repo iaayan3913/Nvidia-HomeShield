@@ -2,13 +2,13 @@ import { useEffect, useRef } from 'react';
 import { CircleAlert, CircleCheck, ClipboardList, Copy, Info, Plus } from 'lucide-react';
 import { Button } from '../../../shared/components/Button';
 import { useNotifications } from '../../../shared/notifications/NotificationProvider';
-import type { Case, Property } from '../../../shared/mock';
+import type { Case } from '../../../shared/mock';
 import { needsUrgentAttention } from '../caseLabels';
 import { CONTACT_METHODS, type ResidentCategory } from '../model';
 
-export function Confirmation({ created, property, category, preferredContact, onTrack, onNewReport }: {
-  created: Case; property?: Property; category?: ResidentCategory; preferredContact: string; onTrack: () => void; onNewReport: () => void;
-}) {
+export interface SubmittedReport { created: Case; home: string | null; category?: ResidentCategory; preferredContact: string }
+
+export function Confirmation({ created, home, category, preferredContact, onTrack, onNewReport }: SubmittedReport & { onTrack: () => void; onNewReport: () => void }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { notify } = useNotifications();
   useEffect(() => { headingRef.current?.focus(); }, []);
@@ -24,22 +24,22 @@ export function Confirmation({ created, property, category, preferredContact, on
     <div className="rp-confirm-head">
       <CircleCheck size={32} aria-hidden="true" className="rp-confirm-icon" />
       <h2 id="rp-confirm-title" ref={headingRef} tabIndex={-1}>Your repair report has been sent</h2>
-      <p>This is a demonstration: a simulated report and case were created in this browser.</p>
+      <p>Thank you. Your housing team has received it.</p>
+      <p className="rp-visually-hidden" role="status">Report sent. Your reference is {created.id}.</p>
     </div>
 
     <div className="rp-reference">
       <span>Your reference</span>
       <strong>{created.id}</strong>
       <Button type="button" variant="quiet" icon={<Copy size={18} aria-hidden="true" />} onClick={() => void copy()}>Copy reference</Button>
+      <p className="field-hint">Keep this reference. You will need it to check progress or if you contact the housing team.</p>
     </div>
 
-    <div className={`rp-callout ${urgent ? 'rp-callout--warning' : 'rp-callout--info'}`} role="status">
+    <div className={`rp-callout ${urgent ? 'rp-callout--warning' : 'rp-callout--info'}`}>
       {urgent ? <CircleAlert size={20} aria-hidden="true" /> : <Info size={20} aria-hidden="true" />}
       <div>
-        <strong>{urgent ? 'Simulated triage: flagged for urgent human attention' : 'Simulated triage: routine officer review'}</strong>
-        <p>{urgent
-          ? 'The demonstration’s automatic rules suggest this may need prompt attention, so it has been highlighted for a housing officer. A person decides the actual urgency.'
-          : 'The demonstration’s automatic rules did not flag this as urgent. A housing officer still reviews every report and decides the actual priority.'}</p>
+        <strong>{urgent ? 'Our automated check suggests this may need prompt attention' : 'Our automated check suggests this is a routine repair'}</strong>
+        <p>A housing officer will confirm the priority. If things get worse before then, report it again or call the housing team.</p>
         {created.hazard_type === 'gas' ? <p><strong>If you can smell gas, call 0800 111 999 now if you have not already.</strong></p> : null}
       </div>
     </div>
@@ -47,12 +47,11 @@ export function Confirmation({ created, property, category, preferredContact, on
     <section aria-labelledby="rp-next-title" className="rp-next">
       <h3 id="rp-next-title">What happens next</h3>
       <ol>
-        <li>A housing officer reviews your {category ? category.label.toLowerCase() : 'repair'} report{property ? ` for ${property.display_address}` : ''}.</li>
-        <li>If a repair visit is needed, the team plans an appointment with a suitable operative.</li>
-        <li>They contact you by {contact} to arrange access.</li>
-        <li>You can check progress at any time using your reference.</li>
+        <li>A housing officer reviews your {category ? category.label.toLowerCase() : 'repair'} report{home ? ` for ${home}` : ''}.</li>
+        <li>If a repair visit is needed, the team books an operative with the right skills.</li>
+        <li>We contact you by {contact} to arrange access.</li>
+        <li>You can check progress at any time with your reference.</li>
       </ol>
-      <p className="field-hint">Timings are not guaranteed in this demonstration and no legal deadline is being set.</p>
     </section>
 
     <div className="rp-actions">

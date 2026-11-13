@@ -1,5 +1,5 @@
 from backend.config import (
-    AGENT_API_KEY, AGENT_BASE_URL, AGENT_MODEL,
+    AGENT_API_KEY, AGENT_BASE_URL, AGENT_CHAT_TEMPLATE_CONTROL, AGENT_ENABLE_THINKING, AGENT_MODEL,
     LLM_API_KEY, LLM_BASE_URL, LLM_MODEL,
 )
 
@@ -34,5 +34,23 @@ class LLMClient:
 class AgentLLMClient(LLMClient):
     """Nemotron Lightning client, separate from the Nano Omni intake endpoint."""
 
-    def __init__(self, base_url=AGENT_BASE_URL, api_key=AGENT_API_KEY, model=AGENT_MODEL):
+    def __init__(self, base_url=AGENT_BASE_URL, api_key=AGENT_API_KEY, model=AGENT_MODEL,
+                 enable_thinking=AGENT_ENABLE_THINKING,
+                 chat_template_control=AGENT_CHAT_TEMPLATE_CONTROL):
         super().__init__(base_url=base_url, api_key=api_key, model=model)
+        self.enable_thinking = enable_thinking
+        if chat_template_control not in {"auto", "true", "false"}:
+            raise ValueError("AGENT_CHAT_TEMPLATE_CONTROL must be auto, true or false")
+        local_ollama = "11434" in base_url or "ollama" in base_url.lower()
+        self.chat_template_control = (chat_template_control == "true" or
+                                      (chat_template_control == "auto" and local_ollama))
+
+    def complete(self, messages: list[dict], **kwargs) -> dict:
+        # Ollama's OpenAI-compatible endpoint forwards this to the Lightning
+        # chat template. Keep it on the agent client so Nano Omni intake is
+        # unaffected.
+        if self.chat_template_control:
+            kwargs.setdefault("extra_body", {
+                "chat_template_kwargs": {"enable_thinking": self.enable_thinking}
+            })
+        return super().complete(messages, **kwargs)

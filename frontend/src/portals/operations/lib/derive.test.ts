@@ -56,9 +56,9 @@ describe('operations derivations', () => {
     expect(emergency.emergency).toBe(true);
   });
 
-  it('keeps proposed routes separate from the active plan and reports released visits', () => {
-    const { case: created } = mockService.createReport({ text: 'Mould in the bathroom', category: 'damp_mould', property_id: 'p-001', contact });
-    const proposal = mockService.generateScheduleProposal(created.id);
+  it('keeps proposed routes separate from the active plan and reports released visits', async () => {
+    const { case: created } = await mockService.createReport({ text: 'Mould in the bathroom', category: 'damp_mould', property_id: 'p-001', contact });
+    const proposal = await mockService.generateScheduleProposal(created.id);
     const state = mockService.getState();
     const lookups = buildLookups(state);
     expect(pendingProposals(state).map((p) => p.id)).toEqual([proposal.id]);
@@ -75,11 +75,11 @@ describe('operations derivations', () => {
     expect(row.worker).toBeUndefined();
   });
 
-  it('builds a timeline covering report, classification, deadlines, scheduling, approval and activation', () => {
-    const { case: created } = mockService.createReport({ text: 'Mould', category: 'damp_mould', property_id: 'p-001', contact });
-    mockService.recordActivity({ case_id: created.id, type: 'schedule.requested', summary: 'requested' });
-    const proposal = mockService.generateScheduleProposal(created.id);
-    mockService.approveProposal(proposal.id, 'demo-officer');
+  it('builds a timeline covering report, classification, deadlines, scheduling, approval and activation', async () => {
+    const { case: created } = await mockService.createReport({ text: 'Mould', category: 'damp_mould', property_id: 'p-001', contact });
+    await mockService.recordActivity({ case_id: created.id, type: 'schedule.requested', summary: 'requested' });
+    const proposal = await mockService.generateScheduleProposal(created.id);
+    await mockService.approveProposal(proposal.id, 'demo-officer');
     const titles = buildTimeline(mockService.getState()).map((e) => e.title);
     for (const title of ['Report received', 'Classification proposed', 'Deadlines calculated', 'Scheduling requested', 'Schedule result returned', 'Approval requested', 'Plan activated']) expect(titles).toContain(title);
     const caseOnly = buildTimeline(mockService.getState(), created.id);

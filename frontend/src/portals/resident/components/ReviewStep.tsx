@@ -1,10 +1,13 @@
 import { Pencil } from 'lucide-react';
-import type { Property } from '../../../shared/mock';
-import { CONTACT_METHODS, categoryById, type ReportDraft, type StepIndex } from '../model';
+import { CONTACT_METHODS, categoryById, normalisePostcode, type ReportDraft, type StepIndex } from '../model';
 import type { PhotoItem, VoiceNote } from '../useEvidence';
 import { PhotoThumb, VoiceClip } from './EvidenceStep';
 
-export function ReviewStep({ draft, property, photos, notes, onEdit }: { draft: ReportDraft; property?: Property; photos: PhotoItem[]; notes: VoiceNote[]; onEdit: (step: StepIndex) => void }) {
+export const homeLabel = (draft: ReportDraft) => draft.addressMode === 'manual'
+  ? (draft.addressLine.trim() ? `${draft.addressLine.trim()}, ${normalisePostcode(draft.postcode)}` : null)
+  : (draft.home ? `${draft.home.display_address}, ${draft.home.postcode}` : null);
+
+export function ReviewStep({ draft, photo, note, onEdit }: { draft: ReportDraft; photo: PhotoItem | null; note: VoiceNote | null; onEdit: (step: StepIndex) => void }) {
   const category = categoryById(draft.category);
   const contact = CONTACT_METHODS.find((item) => item.id === draft.preferredContact)?.label;
   return <div className="rp-step-body">
@@ -16,20 +19,21 @@ export function ReviewStep({ draft, property, photos, notes, onEdit }: { draft: 
       <Row label="Description">{draft.description.trim() ? <span className="rp-prewrap">{draft.description.trim()}</span> : <em>No written description</em>}</Row>
     </ReviewSection>
 
-    <ReviewSection title="Evidence" step={1} onEdit={onEdit}>
-      <Row label="Photos">{photos.length ? <>{photos.length} added<ul className="rp-thumbs rp-thumbs--small" aria-label="Photos to send">{photos.map((photo, index) => <PhotoThumb key={photo.id} photo={photo} index={index} />)}</ul></> : 'None'}</Row>
-      <Row label="Voice notes">{notes.length ? <>{notes.length} recorded<ul className="rp-voice-list" aria-label="Voice notes to send">{notes.map((note, index) => <VoiceClip key={note.id} note={note} index={index} />)}</ul></> : 'None'}</Row>
+    <ReviewSection title="Photo and voice note" step={1} onEdit={onEdit}>
+      <Row label="Photo">{photo ? <>1 photo<PhotoThumb photo={photo} small /></> : 'None'}</Row>
+      <Row label="Voice note">{note ? <VoiceClip note={note} /> : 'None'}</Row>
     </ReviewSection>
 
-    <ReviewSection title="Home and contact" step={2} onEdit={onEdit}>
-      <Row label="Property">{property ? `${property.display_address}, ${property.postcode} (fictional)` : 'Not chosen'}</Row>
+    <ReviewSection title="Your home" step={2} onEdit={onEdit}>
+      <Row label="Address">{homeLabel(draft) ?? 'Not given'}{draft.addressMode === 'manual' ? <span className="field-hint rp-block"> Not found in our records; the housing team will check it.</span> : null}</Row>
+    </ReviewSection>
+
+    <ReviewSection title="Contact details" step={3} onEdit={onEdit}>
       <Row label="Name">{draft.name.trim() || 'Not given'}</Row>
-      <Row label="Contact number">{draft.phone.trim() || 'Not given'}</Row>
+      <Row label="Phone number">{draft.phone.trim() || 'Not given'}</Row>
       <Row label="Preferred contact">{contact ?? 'Not chosen'}</Row>
       <Row label="Access notes">{draft.accessNotes.trim() || 'None'}</Row>
     </ReviewSection>
-
-    <p className="rp-demo-note">By submitting, a simulated report and case are created in this demonstration. A housing officer would review it; nothing is sent to a real landlord or repairs service.</p>
   </div>;
 }
 

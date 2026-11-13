@@ -40,15 +40,20 @@ def test_python_agent_uses_lightning_client_for_tool_selection():
 
         def complete(self, messages, **kwargs):
             calls.append((messages, kwargs))
-            return {"content": '{"actions":[{"name":"get_case","arguments":{}}]}',
+            return {"content": '{"actions":['
+                               '{"name":"compute_deadlines","arguments":{}},'
+                               '{"name":"schedule_job","arguments":{}},'
+                               '{"name":"request_approval","arguments":{"action":"commit_plan"}}]}',
                     "reasoning": "must not be returned"}
 
     executed = []
     agent = PythonToolAgent(lambda name, args: executed.append((name, args)),
                             client=FakeLightning(), use_model=True)
     result = agent.run("case-123")
-    assert calls and executed == [("get_case", {"case_id": "case-123"})]
-    assert result == [{"tool": "get_case", "success": True, "summary": "Tool completed"}]
+    assert calls and [name for name, _ in executed] == [
+        "compute_deadlines", "schedule_job", "request_approval"
+    ]
+    assert all(item["success"] for item in result)
     assert AgentLLMClient().base_url == AGENT_BASE_URL
     assert AgentLLMClient().model == AGENT_MODEL
 
@@ -70,10 +75,19 @@ def test_llm_clients_send_requests_to_their_own_base_urls(monkeypatch):
 
     monkeypatch.setattr("openai.OpenAI", FakeOpenAI)
     LLMClient(base_url="http://omni:8000/v1", api_key="omni", model="omni").complete([])
-    AgentLLMClient(base_url="http://lightning:11434/v1", api_key="agent", model="lightning").complete([])
+    AgentLLMClient(base_url="http://lightning:11434/v1", api_key="agent", model="lightning",
+                   chat_template_control="auto").complete([])
+    AgentLLMClient(base_url="https://integrate.api.nvidia.com/v1", api_key="hosted", model="hosted",
+                   chat_template_control="auto").complete([])
     assert clients == [("http://omni:8000/v1", "omni"),
-                       ("http://lightning:11434/v1", "agent")]
-    assert [request["model"] for request in requests] == ["omni", "lightning"]
+                       ("http://lightning:11434/v1", "agent"),
+                       ("https://integrate.api.nvidia.com/v1", "hosted")]
+    assert [request["model"] for request in requests] == ["omni", "lightning", "hosted"]
+    assert "extra_body" not in requests[0]
+    assert requests[1]["extra_body"] == {
+        "chat_template_kwargs": {"enable_thinking": False}
+    }
+    assert "extra_body" not in requests[2]
 
 
 def test_nemoclaw_url_remains_independent(monkeypatch):
@@ -134,9 +148,63 @@ def test_mock_agent_is_offline_and_unavailable_agent_is_clear():
         def complete(self, messages, **kwargs):
             raise LLMError("endpoint unavailable")
 
-    result = PythonToolAgent(lambda *_: None, client=Unavailable(), use_model=True).run("case-real")
-    assert result == [{"tool": "agent_reasoning", "success": False,
-                       "summary": "Agent reasoning model unavailable (LLMError)"}]
+    executed.clear()
+    result = PythonToolAgent(lambda name, args: executed.append(name),
+                             client=Unavailable(), use_model=True).run("case-real")
+    assert executed == ["compute_deadlines", "schedule_job", "request_approval"]
+    assert result[0] == {"tool": "agent_reasoning", "success": False,
+                         "summary": "Agent reasoning model unavailable (LLMError); deterministic fallback used"}
+    assert all(item["success"] for item in result[1:])
+
+
+@pytest.mark.parametrize("content", ["", '{"actions":[]}'])
+def test_empty_lightning_output_uses_ordered_fallback(content):
+    class EmptyLightning:
+        def complete(self, messages, **kwargs):
+            return {"content": content, "reasoning": None}
+
+    executed = []
+    result = PythonToolAgent(lambda name, args: executed.append(name),
+                             client=EmptyLightning(), use_model=True).run("case-empty")
+    assert executed == ["compute_deadlines", "schedule_job", "request_approval"]
+    assert "deterministic fallback used" in result[0]["summary"]
+
+
+def test_timeout_and_unsafe_tool_order_use_fallback():
+    class TimeoutLightning:
+        def complete(self, messages, **kwargs):
+            raise LLMError("timed out")
+
+    timed = []
+    PythonToolAgent(lambda name, args: timed.append(name), client=TimeoutLightning(),
+                    use_model=True).run("case-timeout")
+    assert timed == ["compute_deadlines", "schedule_job", "request_approval"]
+
+    class UnsafeLightning:
+        def complete(self, messages, **kwargs):
+            return {"content": '{"actions":['
+                               '{"name":"request_approval","arguments":{"action":"commit_plan"}},'
+                               '{"name":"schedule_job","arguments":{}},'
+                               '{"name":"compute_deadlines","arguments":{}}]}'}
+
+    ordered = []
+    result = PythonToolAgent(lambda name, args: ordered.append(name), client=UnsafeLightning(),
+                             use_model=True).run("case-unsafe")
+    assert ordered == ["compute_deadlines", "schedule_job", "request_approval"]
+    assert "deterministic fallback used" in result[0]["summary"]
+
+
+def test_failed_scheduling_never_requests_approval():
+    executed = []
+
+    def executor(name, arguments):
+        executed.append(name)
+        if name == "schedule_job":
+            raise RuntimeError("scheduler unavailable")
+
+    result = PythonToolAgent(executor, use_model=False).run("case-failed")
+    assert executed == ["compute_deadlines", "schedule_job"]
+    assert result[-1]["tool"] == "schedule_job" and result[-1]["success"] is False
 
 
 def test_missing_nemoclaw_configuration_is_explicit():

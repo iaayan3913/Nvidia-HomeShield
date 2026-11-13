@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -159,11 +159,24 @@ class Approval(APIModel):
     executed_at: datetime | None = None
 
 
+class ContactIn(APIModel):
+    """Resident contact details. Stored privately; never emitted in events, SSE or logs."""
+    name: str | None = Field(default=None, max_length=100)
+    phone: str | None = Field(default=None, max_length=40)
+    email: str | None = Field(default=None, max_length=200)
+    preferred: Literal["phone", "text", "email"] | None = None
+    access_notes: str | None = Field(default=None, max_length=500)
+
+
 class ReportIn(APIModel):
     text: str = Field(min_length=1, max_length=5000)
     photo_uri: str | None = Field(default=None, max_length=1000)
     audio_uri: str | None = Field(default=None, max_length=1000)
     property_id: str | None = Field(default=None, max_length=100)
+    # Optional private fields (round 2). Not passed to intake and never emitted.
+    contact: ContactIn | None = None
+    address_line: str | None = Field(default=None, max_length=200)
+    postcode: str | None = Field(default=None, max_length=12)
 
     @field_validator("text")
     @classmethod
@@ -195,3 +208,12 @@ class DecisionIn(APIModel):
 
 class EmergencyIn(ReportIn):
     pass
+
+
+JobProgressStatus = Literal["travelling", "on_site", "completed", "unable_to_complete"]
+
+
+class JobProgressIn(APIModel):
+    status: JobProgressStatus
+    notes: str | None = Field(default=None, max_length=1000)
+    evidence_count: int | None = Field(default=None, ge=0, le=20)

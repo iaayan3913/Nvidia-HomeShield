@@ -37,7 +37,11 @@ INTAKE_MODEL = os.getenv("INTAKE_MODEL", LLM_MODEL)
 AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://127.0.0.1:11434/v1")
 AGENT_API_KEY = os.getenv("AGENT_API_KEY", LLM_API_KEY)
 AGENT_MODEL = os.getenv("AGENT_MODEL", LLM_MODEL)
+AGENT_ENABLE_THINKING = env_bool("AGENT_ENABLE_THINKING", False)
+AGENT_CHAT_TEMPLATE_CONTROL = os.getenv("AGENT_CHAT_TEMPLATE_CONTROL", "auto").strip().lower()
 NEMOCLAW_URL = os.getenv("NEMOCLAW_URL", "")
 COMPONENT_TIMEOUT_SECONDS = float(os.getenv("COMPONENT_TIMEOUT_SECONDS", "20"))
 AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS", "8"))
+# Development-only: enables POST /api/dev/reset, which deletes every case, plan, approval and event.
+ALLOW_DEV_RESET = env_bool("ALLOW_DEV_RESET", False)
 CORS_ORIGINS = [v.strip() for v in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if v.strip()]
