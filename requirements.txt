@@ -6,4 +6,5 @@ httpx
 openai
 pyyaml
 pytest
-# Optional on the Spark: cuopt, ortools, osmnx
+ortools  # scheduler fallback (pure-Python mock still works without it)
+# Optional: cuopt (Spark GPU, VERIFY aarch64), osmnx (real roads + travel matrix)

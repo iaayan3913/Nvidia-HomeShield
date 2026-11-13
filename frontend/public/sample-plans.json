@@ -1,0 +1,1152 @@
+{
+  "generated_at": "2026-11-13T10:51:35.677126",
+  "solver": "ortools",
+  "travel_source": "haversine_x1.3_at_25kmh",
+  "emergency_at": "2026-11-13T11:00:00",
+  "emergency_job": {
+    "id": "job-emergency-demo",
+    "case_id": "case-emergency-demo",
+    "required_skill": "gas",
+    "duration_minutes": 60,
+    "lat": 53.37066,
+    "lon": -1.454132,
+    "earliest": "2026-11-13T11:00:00",
+    "latest": "2026-11-13T13:00:00",
+    "priority": 5
+  },
+  "workers": [
+    {
+      "id": "w-1",
+      "name": "Amira Hussain",
+      "skills": [
+        "general",
+        "damp_mould"
+      ],
+      "shift_start": "2026-11-13T07:00:00",
+      "shift_end": "2026-11-13T15:00:00",
+      "lat": 53.422,
+      "lon": -1.4585
+    },
+    {
+      "id": "w-2",
+      "name": "Dan Clarke",
+      "skills": [
+        "general",
+        "plumbing",
+        "gas"
+      ],
+      "shift_start": "2026-11-13T08:00:00",
+      "shift_end": "2026-11-13T16:00:00",
+      "lat": 53.3712,
+      "lon": -1.4515
+    },
+    {
+      "id": "w-3",
+      "name": "Priya Patel",
+      "skills": [
+        "electrical",
+        "fire"
+      ],
+      "shift_start": "2026-11-13T08:00:00",
+      "shift_end": "2026-11-13T16:00:00",
+      "lat": 53.3928,
+      "lon": -1.4115
+    },
+    {
+      "id": "w-4",
+      "name": "Tom Walker",
+      "skills": [
+        "gas",
+        "plumbing"
+      ],
+      "shift_start": "2026-11-13T08:00:00",
+      "shift_end": "2026-11-13T16:00:00",
+      "lat": 53.346,
+      "lon": -1.4395
+    },
+    {
+      "id": "w-5",
+      "name": "Grace Okafor",
+      "skills": [
+        "general",
+        "damp_mould",
+        "plumbing"
+      ],
+      "shift_start": "2026-11-13T09:00:00",
+      "shift_end": "2026-11-13T17:00:00",
+      "lat": 53.4052,
+      "lon": -1.5035
+    },
+    {
+      "id": "w-6",
+      "name": "Kieran Shaw",
+      "skills": [
+        "electrical",
+        "general"
+      ],
+      "shift_start": "2026-11-13T09:00:00",
+      "shift_end": "2026-11-13T17:00:00",
+      "lat": 53.3438,
+      "lon": -1.4115
+    },
+    {
+      "id": "w-7",
+      "name": "Leah Fletcher",
+      "skills": [
+        "general",
+        "damp_mould"
+      ],
+      "shift_start": "2026-11-13T10:00:00",
+      "shift_end": "2026-11-13T18:00:00",
+      "lat": 53.399,
+      "lon": -1.4505
+    },
+    {
+      "id": "w-8",
+      "name": "Sam Ahmed",
+      "skills": [
+        "general",
+        "fire"
+      ],
+      "shift_start": "2026-11-13T07:00:00",
+      "shift_end": "2026-11-13T15:00:00",
+      "lat": 53.3652,
+      "lon": -1.3815
+    }
+  ],
+  "jobs": [
+    {
+      "id": "j-001",
+      "case_id": "case-seed-001",
+      "required_skill": "general",
+      "duration_minutes": 30,
+      "lat": 53.401671,
+      "lon": -1.402093,
+      "earliest": null,
+      "latest": "2026-11-13T13:00:00",
+      "priority": 3
+    },
+    {
+      "id": "j-002",
+      "case_id": "case-seed-002",
+      "required_skill": "damp_mould",
+      "duration_minutes": 75,
+      "lat": 53.421591,
+      "lon": -1.45552,
+      "earliest": null,
+      "latest": "2026-11-13T11:00:00",
+      "priority": 3
+    },
+    {
+      "id": "j-003",
+      "case_id": "case-seed-003",
+      "required_skill": "general",
+      "duration_minutes": 60,
+      "lat": 53.331557,
+      "lon": -1.363061,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 2
+    },
+    {
+      "id": "j-004",
+      "case_id": "case-seed-004",
+      "required_skill": "electrical",
+      "duration_minutes": 75,
+      "lat": 53.396272,
+      "lon": -1.504784,
+      "earliest": null,
+      "latest": "2026-11-13T15:00:00",
+      "priority": 3
+    },
+    {
+      "id": "j-005",
+      "case_id": "case-seed-005",
+      "required_skill": "plumbing",
+      "duration_minutes": 45,
+      "lat": 53.343643,
+      "lon": -1.440357,
+      "earliest": null,
+      "latest": null,
+      "priority": 1
+    },
+    {
+      "id": "j-006",
+      "case_id": "case-seed-006",
+      "required_skill": "electrical",
+      "duration_minutes": 60,
+      "lat": 53.41279,
+      "lon": -1.491578,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 2
+    },
+    {
+      "id": "j-007",
+      "case_id": "case-seed-007",
+      "required_skill": "plumbing",
+      "duration_minutes": 75,
+      "lat": 53.363623,
+      "lon": -1.37767,
+      "earliest": null,
+      "latest": null,
+      "priority": 2
+    },
+    {
+      "id": "j-008",
+      "case_id": "case-seed-008",
+      "required_skill": "damp_mould",
+      "duration_minutes": 75,
+      "lat": 53.360962,
+      "lon": -1.372239,
+      "earliest": null,
+      "latest": "2026-11-13T15:00:00",
+      "priority": 3
+    },
+    {
+      "id": "j-009",
+      "case_id": "case-seed-009",
+      "required_skill": "general",
+      "duration_minutes": 45,
+      "lat": 53.349908,
+      "lon": -1.421478,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 2
+    },
+    {
+      "id": "j-010",
+      "case_id": "case-seed-010",
+      "required_skill": "damp_mould",
+      "duration_minutes": 75,
+      "lat": 53.428657,
+      "lon": -1.490679,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 1
+    },
+    {
+      "id": "j-011",
+      "case_id": "case-seed-011",
+      "required_skill": "electrical",
+      "duration_minutes": 60,
+      "lat": 53.406826,
+      "lon": -1.508564,
+      "earliest": "2026-11-13T12:00:00",
+      "latest": "2026-11-13T16:30:00",
+      "priority": 1
+    },
+    {
+      "id": "j-012",
+      "case_id": "case-seed-012",
+      "required_skill": "general",
+      "duration_minutes": 45,
+      "lat": 53.418656,
+      "lon": -1.455347,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 1
+    },
+    {
+      "id": "j-013",
+      "case_id": "case-seed-013",
+      "required_skill": "gas",
+      "duration_minutes": 60,
+      "lat": 53.389209,
+      "lon": -1.478622,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 1
+    },
+    {
+      "id": "j-014",
+      "case_id": "case-seed-014",
+      "required_skill": "fire",
+      "duration_minutes": 45,
+      "lat": 53.339651,
+      "lon": -1.402147,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 1
+    },
+    {
+      "id": "j-015",
+      "case_id": "case-seed-015",
+      "required_skill": "damp_mould",
+      "duration_minutes": 75,
+      "lat": 53.454469,
+      "lon": -1.470217,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 1
+    },
+    {
+      "id": "j-016",
+      "case_id": "case-seed-016",
+      "required_skill": "damp_mould",
+      "duration_minutes": 90,
+      "lat": 53.34959,
+      "lon": -1.487036,
+      "earliest": null,
+      "latest": "2026-11-13T14:00:00",
+      "priority": 3
+    },
+    {
+      "id": "j-017",
+      "case_id": "case-seed-017",
+      "required_skill": "electrical",
+      "duration_minutes": 60,
+      "lat": 53.38313,
+      "lon": -1.485902,
+      "earliest": "2026-11-13T12:00:00",
+      "latest": "2026-11-13T16:30:00",
+      "priority": 1
+    },
+    {
+      "id": "j-018",
+      "case_id": "case-seed-018",
+      "required_skill": "plumbing",
+      "duration_minutes": 60,
+      "lat": 53.345694,
+      "lon": -1.358429,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 1
+    },
+    {
+      "id": "j-019",
+      "case_id": "case-seed-019",
+      "required_skill": "plumbing",
+      "duration_minutes": 75,
+      "lat": 53.369912,
+      "lon": -1.449551,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 1
+    },
+    {
+      "id": "j-020",
+      "case_id": "case-seed-020",
+      "required_skill": "electrical",
+      "duration_minutes": 45,
+      "lat": 53.37399,
+      "lon": -1.458414,
+      "earliest": null,
+      "latest": "2026-11-13T12:00:00",
+      "priority": 3
+    },
+    {
+      "id": "j-021",
+      "case_id": "case-seed-021",
+      "required_skill": "damp_mould",
+      "duration_minutes": 90,
+      "lat": 53.465647,
+      "lon": -1.466166,
+      "earliest": null,
+      "latest": null,
+      "priority": 2
+    },
+    {
+      "id": "j-022",
+      "case_id": "case-seed-022",
+      "required_skill": "damp_mould",
+      "duration_minutes": 60,
+      "lat": 53.3906,
+      "lon": -1.40788,
+      "earliest": null,
+      "latest": "2026-11-13T14:00:00",
+      "priority": 3
+    },
+    {
+      "id": "j-023",
+      "case_id": "case-seed-023",
+      "required_skill": "damp_mould",
+      "duration_minutes": 75,
+      "lat": 53.398014,
+      "lon": -1.414277,
+      "earliest": "2026-11-13T12:00:00",
+      "latest": "2026-11-13T16:30:00",
+      "priority": 1
+    },
+    {
+      "id": "j-024",
+      "case_id": "case-seed-024",
+      "required_skill": "general",
+      "duration_minutes": 45,
+      "lat": 53.397601,
+      "lon": -1.510248,
+      "earliest": null,
+      "latest": null,
+      "priority": 2
+    },
+    {
+      "id": "j-025",
+      "case_id": "case-seed-025",
+      "required_skill": "gas",
+      "duration_minutes": 60,
+      "lat": 53.347269,
+      "lon": -1.462172,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 2
+    },
+    {
+      "id": "j-026",
+      "case_id": "case-seed-026",
+      "required_skill": "general",
+      "duration_minutes": 60,
+      "lat": 53.422923,
+      "lon": -1.479183,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 1
+    },
+    {
+      "id": "j-027",
+      "case_id": "case-seed-027",
+      "required_skill": "plumbing",
+      "duration_minutes": 45,
+      "lat": 53.378256,
+      "lon": -1.516869,
+      "earliest": "2026-11-13T12:00:00",
+      "latest": "2026-11-13T16:30:00",
+      "priority": 1
+    },
+    {
+      "id": "j-028",
+      "case_id": "case-seed-028",
+      "required_skill": "damp_mould",
+      "duration_minutes": 75,
+      "lat": 53.345481,
+      "lon": -1.445363,
+      "earliest": "2026-11-13T12:00:00",
+      "latest": "2026-11-13T16:30:00",
+      "priority": 1
+    },
+    {
+      "id": "j-029",
+      "case_id": "case-seed-029",
+      "required_skill": "plumbing",
+      "duration_minutes": 60,
+      "lat": 53.38904,
+      "lon": -1.393653,
+      "earliest": null,
+      "latest": null,
+      "priority": 2
+    },
+    {
+      "id": "j-030",
+      "case_id": "case-seed-030",
+      "required_skill": "damp_mould",
+      "duration_minutes": 60,
+      "lat": 53.403102,
+      "lon": -1.522969,
+      "earliest": null,
+      "latest": null,
+      "priority": 1
+    },
+    {
+      "id": "j-031",
+      "case_id": "case-seed-031",
+      "required_skill": "damp_mould",
+      "duration_minutes": 75,
+      "lat": 53.464824,
+      "lon": -1.465275,
+      "earliest": null,
+      "latest": null,
+      "priority": 2
+    },
+    {
+      "id": "j-032",
+      "case_id": "case-seed-032",
+      "required_skill": "plumbing",
+      "duration_minutes": 90,
+      "lat": 53.334403,
+      "lon": -1.363542,
+      "earliest": null,
+      "latest": null,
+      "priority": 1
+    },
+    {
+      "id": "j-033",
+      "case_id": "case-seed-033",
+      "required_skill": "fire",
+      "duration_minutes": 45,
+      "lat": 53.386827,
+      "lon": -1.480423,
+      "earliest": "2026-11-13T12:00:00",
+      "latest": "2026-11-13T16:30:00",
+      "priority": 2
+    },
+    {
+      "id": "j-034",
+      "case_id": "case-seed-034",
+      "required_skill": "general",
+      "duration_minutes": 60,
+      "lat": 53.375933,
+      "lon": -1.441327,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T10:30:00",
+      "priority": 5
+    },
+    {
+      "id": "j-035",
+      "case_id": "case-seed-035",
+      "required_skill": "plumbing",
+      "duration_minutes": 90,
+      "lat": 53.354522,
+      "lon": -1.43087,
+      "earliest": null,
+      "latest": null,
+      "priority": 2
+    },
+    {
+      "id": "j-036",
+      "case_id": "case-seed-036",
+      "required_skill": "damp_mould",
+      "duration_minutes": 60,
+      "lat": 53.415569,
+      "lon": -1.463057,
+      "earliest": "2026-11-13T08:00:00",
+      "latest": "2026-11-13T12:00:00",
+      "priority": 2
+    }
+  ],
+  "before": {
+    "id": "plan-22b3e0c3",
+    "solver": "ortools",
+    "solver_ms": 1070.2,
+    "workers": [
+      {
+        "worker_id": "w-1",
+        "stops": [
+          {
+            "job_id": "j-002",
+            "eta": "2026-11-13T07:01:00",
+            "lat": 53.421591,
+            "lon": -1.45552,
+            "slack_minutes": 239
+          },
+          {
+            "job_id": "j-036",
+            "eta": "2026-11-13T08:19:00",
+            "lat": 53.415569,
+            "lon": -1.463057,
+            "slack_minutes": 221
+          },
+          {
+            "job_id": "j-010",
+            "eta": "2026-11-13T09:27:00",
+            "lat": 53.428657,
+            "lon": -1.490679,
+            "slack_minutes": 153
+          },
+          {
+            "job_id": "j-015",
+            "eta": "2026-11-13T10:52:00",
+            "lat": 53.454469,
+            "lon": -1.470217,
+            "slack_minutes": 68
+          },
+          {
+            "job_id": "j-021",
+            "eta": "2026-11-13T12:11:00",
+            "lat": 53.465647,
+            "lon": -1.466166,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-031",
+            "eta": "2026-11-13T13:42:00",
+            "lat": 53.464824,
+            "lon": -1.465275,
+            "slack_minutes": null
+          }
+        ]
+      },
+      {
+        "worker_id": "w-2",
+        "stops": [
+          {
+            "job_id": "j-019",
+            "eta": "2026-11-13T08:01:00",
+            "lat": 53.369912,
+            "lon": -1.449551,
+            "slack_minutes": 239
+          },
+          {
+            "job_id": "j-013",
+            "eta": "2026-11-13T09:26:00",
+            "lat": 53.389209,
+            "lon": -1.478622,
+            "slack_minutes": 154
+          },
+          {
+            "job_id": "j-026",
+            "eta": "2026-11-13T10:38:00",
+            "lat": 53.422923,
+            "lon": -1.479183,
+            "slack_minutes": 82
+          },
+          {
+            "job_id": "j-012",
+            "eta": "2026-11-13T11:44:00",
+            "lat": 53.418656,
+            "lon": -1.455347,
+            "slack_minutes": 16
+          },
+          {
+            "job_id": "j-001",
+            "eta": "2026-11-13T12:42:00",
+            "lat": 53.401671,
+            "lon": -1.402093,
+            "slack_minutes": 18
+          },
+          {
+            "job_id": "j-029",
+            "eta": "2026-11-13T13:17:00",
+            "lat": 53.38904,
+            "lon": -1.393653,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-007",
+            "eta": "2026-11-13T14:27:00",
+            "lat": 53.363623,
+            "lon": -1.37767,
+            "slack_minutes": null
+          }
+        ]
+      },
+      {
+        "worker_id": "w-3",
+        "stops": [
+          {
+            "job_id": "j-006",
+            "eta": "2026-11-13T08:18:00",
+            "lat": 53.41279,
+            "lon": -1.491578,
+            "slack_minutes": 222
+          },
+          {
+            "job_id": "j-004",
+            "eta": "2026-11-13T09:25:00",
+            "lat": 53.396272,
+            "lon": -1.504784,
+            "slack_minutes": 335
+          },
+          {
+            "job_id": "j-011",
+            "eta": "2026-11-13T12:00:00",
+            "lat": 53.406826,
+            "lon": -1.508564,
+            "slack_minutes": 270
+          },
+          {
+            "job_id": "j-033",
+            "eta": "2026-11-13T13:10:00",
+            "lat": 53.386827,
+            "lon": -1.480423,
+            "slack_minutes": 200
+          },
+          {
+            "job_id": "j-017",
+            "eta": "2026-11-13T13:57:00",
+            "lat": 53.38313,
+            "lon": -1.485902,
+            "slack_minutes": 153
+          }
+        ]
+      },
+      {
+        "worker_id": "w-4",
+        "stops": [
+          {
+            "job_id": "j-005",
+            "eta": "2026-11-13T08:01:00",
+            "lat": 53.343643,
+            "lon": -1.440357,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-025",
+            "eta": "2026-11-13T08:51:00",
+            "lat": 53.347269,
+            "lon": -1.462172,
+            "slack_minutes": 189
+          },
+          {
+            "job_id": "j-035",
+            "eta": "2026-11-13T09:58:00",
+            "lat": 53.354522,
+            "lon": -1.43087,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-018",
+            "eta": "2026-11-13T11:44:00",
+            "lat": 53.345694,
+            "lon": -1.358429,
+            "slack_minutes": 16
+          },
+          {
+            "job_id": "j-032",
+            "eta": "2026-11-13T12:49:00",
+            "lat": 53.334403,
+            "lon": -1.363542,
+            "slack_minutes": null
+          }
+        ]
+      },
+      {
+        "worker_id": "w-5",
+        "stops": [
+          {
+            "job_id": "j-024",
+            "eta": "2026-11-13T09:03:00",
+            "lat": 53.397601,
+            "lon": -1.510248,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-030",
+            "eta": "2026-11-13T09:52:00",
+            "lat": 53.403102,
+            "lon": -1.522969,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-027",
+            "eta": "2026-11-13T12:00:00",
+            "lat": 53.378256,
+            "lon": -1.516869,
+            "slack_minutes": 270
+          },
+          {
+            "job_id": "j-016",
+            "eta": "2026-11-13T12:57:00",
+            "lat": 53.34959,
+            "lon": -1.487036,
+            "slack_minutes": 63
+          },
+          {
+            "job_id": "j-028",
+            "eta": "2026-11-13T14:36:00",
+            "lat": 53.345481,
+            "lon": -1.445363,
+            "slack_minutes": 114
+          }
+        ]
+      },
+      {
+        "worker_id": "w-6",
+        "stops": [
+          {
+            "job_id": "j-009",
+            "eta": "2026-11-13T09:03:00",
+            "lat": 53.349908,
+            "lon": -1.421478,
+            "slack_minutes": 177
+          },
+          {
+            "job_id": "j-034",
+            "eta": "2026-11-13T09:58:00",
+            "lat": 53.375933,
+            "lon": -1.441327,
+            "slack_minutes": 32
+          },
+          {
+            "job_id": "j-020",
+            "eta": "2026-11-13T11:02:00",
+            "lat": 53.37399,
+            "lon": -1.458414,
+            "slack_minutes": 58
+          }
+        ]
+      },
+      {
+        "worker_id": "w-7",
+        "stops": [
+          {
+            "job_id": "j-023",
+            "eta": "2026-11-13T12:00:00",
+            "lat": 53.398014,
+            "lon": -1.414277,
+            "slack_minutes": 270
+          },
+          {
+            "job_id": "j-022",
+            "eta": "2026-11-13T13:18:00",
+            "lat": 53.3906,
+            "lon": -1.40788,
+            "slack_minutes": 42
+          },
+          {
+            "job_id": "j-008",
+            "eta": "2026-11-13T14:31:00",
+            "lat": 53.360962,
+            "lon": -1.372239,
+            "slack_minutes": 29
+          }
+        ]
+      },
+      {
+        "worker_id": "w-8",
+        "stops": [
+          {
+            "job_id": "j-014",
+            "eta": "2026-11-13T08:00:00",
+            "lat": 53.339651,
+            "lon": -1.402147,
+            "slack_minutes": 240
+          },
+          {
+            "job_id": "j-003",
+            "eta": "2026-11-13T08:54:00",
+            "lat": 53.331557,
+            "lon": -1.363061,
+            "slack_minutes": 186
+          }
+        ]
+      }
+    ],
+    "unassigned_jobs": [],
+    "conflicts": []
+  },
+  "after": {
+    "id": "plan-16ec996e",
+    "solver": "ortools",
+    "solver_ms": 1004.7,
+    "workers": [
+      {
+        "worker_id": "w-1",
+        "stops": [
+          {
+            "job_id": "j-002",
+            "eta": "2026-11-13T07:01:00",
+            "lat": 53.421591,
+            "lon": -1.45552,
+            "slack_minutes": 239
+          },
+          {
+            "job_id": "j-036",
+            "eta": "2026-11-13T08:19:00",
+            "lat": 53.415569,
+            "lon": -1.463057,
+            "slack_minutes": 221
+          },
+          {
+            "job_id": "j-010",
+            "eta": "2026-11-13T09:27:00",
+            "lat": 53.428657,
+            "lon": -1.490679,
+            "slack_minutes": 153
+          },
+          {
+            "job_id": "j-015",
+            "eta": "2026-11-13T10:52:00",
+            "lat": 53.454469,
+            "lon": -1.470217,
+            "slack_minutes": 68
+          },
+          {
+            "job_id": "j-031",
+            "eta": "2026-11-13T12:11:00",
+            "lat": 53.464824,
+            "lon": -1.465275,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-021",
+            "eta": "2026-11-13T13:27:00",
+            "lat": 53.465647,
+            "lon": -1.466166,
+            "slack_minutes": null
+          }
+        ]
+      },
+      {
+        "worker_id": "w-2",
+        "stops": [
+          {
+            "job_id": "j-019",
+            "eta": "2026-11-13T08:01:00",
+            "lat": 53.369912,
+            "lon": -1.449551,
+            "slack_minutes": 239
+          },
+          {
+            "job_id": "j-013",
+            "eta": "2026-11-13T09:26:00",
+            "lat": 53.389209,
+            "lon": -1.478622,
+            "slack_minutes": 154
+          },
+          {
+            "job_id": "j-026",
+            "eta": "2026-11-13T10:38:00",
+            "lat": 53.422923,
+            "lon": -1.479183,
+            "slack_minutes": 82
+          },
+          {
+            "job_id": "j-012",
+            "eta": "2026-11-13T11:44:00",
+            "lat": 53.418656,
+            "lon": -1.455347,
+            "slack_minutes": 16
+          },
+          {
+            "job_id": "job-emergency-demo",
+            "eta": "2026-11-13T12:46:00",
+            "lat": 53.37066,
+            "lon": -1.454132,
+            "slack_minutes": 14
+          },
+          {
+            "job_id": "j-029",
+            "eta": "2026-11-13T14:01:00",
+            "lat": 53.38904,
+            "lon": -1.393653,
+            "slack_minutes": null
+          }
+        ]
+      },
+      {
+        "worker_id": "w-3",
+        "stops": [
+          {
+            "job_id": "j-006",
+            "eta": "2026-11-13T08:18:00",
+            "lat": 53.41279,
+            "lon": -1.491578,
+            "slack_minutes": 222
+          },
+          {
+            "job_id": "j-004",
+            "eta": "2026-11-13T09:25:00",
+            "lat": 53.396272,
+            "lon": -1.504784,
+            "slack_minutes": 335
+          },
+          {
+            "job_id": "j-011",
+            "eta": "2026-11-13T12:00:00",
+            "lat": 53.406826,
+            "lon": -1.508564,
+            "slack_minutes": 270
+          },
+          {
+            "job_id": "j-017",
+            "eta": "2026-11-13T13:10:00",
+            "lat": 53.38313,
+            "lon": -1.485902,
+            "slack_minutes": 200
+          },
+          {
+            "job_id": "j-033",
+            "eta": "2026-11-13T14:12:00",
+            "lat": 53.386827,
+            "lon": -1.480423,
+            "slack_minutes": 138
+          }
+        ]
+      },
+      {
+        "worker_id": "w-4",
+        "stops": [
+          {
+            "job_id": "j-005",
+            "eta": "2026-11-13T08:01:00",
+            "lat": 53.343643,
+            "lon": -1.440357,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-025",
+            "eta": "2026-11-13T08:51:00",
+            "lat": 53.347269,
+            "lon": -1.462172,
+            "slack_minutes": 189
+          },
+          {
+            "job_id": "j-035",
+            "eta": "2026-11-13T09:58:00",
+            "lat": 53.354522,
+            "lon": -1.43087,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-018",
+            "eta": "2026-11-13T11:44:00",
+            "lat": 53.345694,
+            "lon": -1.358429,
+            "slack_minutes": 16
+          },
+          {
+            "job_id": "j-032",
+            "eta": "2026-11-13T12:49:00",
+            "lat": 53.334403,
+            "lon": -1.363542,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-007",
+            "eta": "2026-11-13T14:30:00",
+            "lat": 53.363623,
+            "lon": -1.37767,
+            "slack_minutes": null
+          }
+        ]
+      },
+      {
+        "worker_id": "w-5",
+        "stops": [
+          {
+            "job_id": "j-024",
+            "eta": "2026-11-13T09:03:00",
+            "lat": 53.397601,
+            "lon": -1.510248,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-030",
+            "eta": "2026-11-13T09:52:00",
+            "lat": 53.403102,
+            "lon": -1.522969,
+            "slack_minutes": null
+          },
+          {
+            "job_id": "j-027",
+            "eta": "2026-11-13T12:00:00",
+            "lat": 53.378256,
+            "lon": -1.516869,
+            "slack_minutes": 270
+          },
+          {
+            "job_id": "j-016",
+            "eta": "2026-11-13T12:57:00",
+            "lat": 53.34959,
+            "lon": -1.487036,
+            "slack_minutes": 63
+          },
+          {
+            "job_id": "j-028",
+            "eta": "2026-11-13T14:36:00",
+            "lat": 53.345481,
+            "lon": -1.445363,
+            "slack_minutes": 114
+          }
+        ]
+      },
+      {
+        "worker_id": "w-6",
+        "stops": [
+          {
+            "job_id": "j-009",
+            "eta": "2026-11-13T09:03:00",
+            "lat": 53.349908,
+            "lon": -1.421478,
+            "slack_minutes": 177
+          },
+          {
+            "job_id": "j-034",
+            "eta": "2026-11-13T09:58:00",
+            "lat": 53.375933,
+            "lon": -1.441327,
+            "slack_minutes": 32
+          },
+          {
+            "job_id": "j-020",
+            "eta": "2026-11-13T11:04:00",
+            "lat": 53.37399,
+            "lon": -1.458414,
+            "slack_minutes": 56
+          }
+        ]
+      },
+      {
+        "worker_id": "w-7",
+        "stops": [
+          {
+            "job_id": "j-001",
+            "eta": "2026-11-13T11:11:00",
+            "lat": 53.401671,
+            "lon": -1.402093,
+            "slack_minutes": 109
+          },
+          {
+            "job_id": "j-023",
+            "eta": "2026-11-13T12:00:00",
+            "lat": 53.398014,
+            "lon": -1.414277,
+            "slack_minutes": 270
+          },
+          {
+            "job_id": "j-022",
+            "eta": "2026-11-13T13:18:00",
+            "lat": 53.3906,
+            "lon": -1.40788,
+            "slack_minutes": 42
+          },
+          {
+            "job_id": "j-008",
+            "eta": "2026-11-13T14:31:00",
+            "lat": 53.360962,
+            "lon": -1.372239,
+            "slack_minutes": 29
+          }
+        ]
+      },
+      {
+        "worker_id": "w-8",
+        "stops": [
+          {
+            "job_id": "j-014",
+            "eta": "2026-11-13T08:00:00",
+            "lat": 53.339651,
+            "lon": -1.402147,
+            "slack_minutes": 240
+          },
+          {
+            "job_id": "j-003",
+            "eta": "2026-11-13T08:54:00",
+            "lat": 53.331557,
+            "lon": -1.363061,
+            "slack_minutes": 186
+          }
+        ]
+      }
+    ],
+    "unassigned_jobs": [],
+    "conflicts": []
+  },
+  "diff": {
+    "moved": [
+      {
+        "job_id": "j-007",
+        "from": "w-2",
+        "to": "w-4"
+      },
+      {
+        "job_id": "j-001",
+        "from": "w-2",
+        "to": "w-7"
+      }
+    ],
+    "added": [
+      {
+        "job_id": "job-emergency-demo",
+        "to": "w-2"
+      }
+    ],
+    "dropped": [],
+    "changed_workers": [
+      "w-2",
+      "w-4",
+      "w-7"
+    ],
+    "solver": "ortools",
+    "solver_ms": 1004.7
+  }
+}
