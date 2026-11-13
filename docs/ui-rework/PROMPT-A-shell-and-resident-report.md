@@ -1,10 +1,32 @@
 # Prompt A: app shell, tabs and the resident report screen
 
-Copy everything below the line into your coding agent.
+**Owner: Enan.** Copy everything below the line into your coding agent.
 
 ---
 
-You are working on HomeShield, a hackathon demo (NVIDIA Hack for Impact, Sheffield, today). It has a React + TypeScript + Vite frontend in `frontend/` (deck.gl and MapLibre map) and a FastAPI backend in `backend/`. Read `docs/ui-rework/README.md` first: it lists the shared rules, the backend API, and Step 0 (the frontend source must be committed before you start). Work on a new branch from `main`.
+You are working on HomeShield, a hackathon demo (NVIDIA Hack for Impact, Sheffield, today). It has a React + TypeScript + Vite frontend in `frontend/` (deck.gl and MapLibre map) and a FastAPI backend in `backend/`. Read `docs/ui-rework/README.md` first: it lists the shared rules and the backend API. Work on a new branch from `main`.
+
+## Step 0, do this before anything else: upload the missing frontend source
+
+The dashboard on `main` exists only as a compiled build in `frontend/mock-build/`. The source it was built from was never committed. `frontend/src/` on `main` holds only the 14-line starter `main.tsx`, and two other teammates (workstreams B and C) are blocked until the source is in git. This machine (Enan's) built that dashboard, so the source should be here.
+
+1. **Find the source.** Look for the project that contains `src/lib/theme.ts` (referenced by `frontend/mock-build/index.html`) and a `TwinMap` component. It may be:
+   - untracked files in this repo (`git status --untracked-files=all frontend`);
+   - a different folder or a separate Vite project on this laptop (search the disk for `theme.ts` together with `TwinMap*`);
+   - another git branch, or a stash.
+   Signs you have the right one: its `package.json` lists **maplibre-gl**, **@fontsource/ibm-plex-sans** and **@fontsource/ibm-plex-mono**, and **React 19**. The compiled build uses all of these, but the repo's current `frontend/package.json` lists none of the first three and pins React 18. If you cannot find it, stop and tell Enan; do not try to rebuild the UI from the minified bundle.
+2. **Copy it into `frontend/`** without losing the repo's existing files: `public/properties.geojson`, `public/roads-major.geojson`, `public/sample-*.json`, `mock-build/`.
+   - Bring over `src/**`, `index.html`, `vite.config.*`, `tsconfig*.json`, `package.json` **and** `package-lock.json`, and any mock-data or asset files the source imports.
+   - Keep the repo's `mock` script in `package.json` (`vite preview --outDir mock-build --port 4173 --strictPort`).
+   - Never commit `node_modules/`, `dist/`, `.env` files or API keys.
+3. **Prove it builds from a clean checkout.**
+   - Run `npm ci` (or `npm install`), then `npm run build`, with no TypeScript errors.
+   - Run `npm run dev`; it must show the same dashboard as `npm run mock`.
+   - Then clone the repo into a temporary folder, check out your branch and repeat. That catches files that exist only on this laptop.
+4. **Commit and merge to `main` straight away**, on its own branch, before any UI changes. Use the commit message `frontend: add dashboard source (previously only mock-build was committed)`. Then tell the team: workstreams B and C start from this commit.
+5. Delete the stray `package-lock.json` in the **repo root** if one exists; it comes from running npm outside `frontend/`.
+
+Only once Step 0 is merged, start the tasks below on a new branch.
 
 **You own:** the app shell (top-level layout, header navigation, routing), the Schedule tab container, the Agent activity drawer, the resident report page, `frontend/vite.config.*`, frontend env/config, and the device/network runbook. **Do not change** map layers (workstream B) or the case list, case cards and header counters (workstream C). Your layout change merges first, so keep it focused and open the PR early.
 

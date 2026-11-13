@@ -1,10 +1,12 @@
 # Prompt B: the Sheffield twin map
 
-Copy everything below the line into your coding agent.
+**Owner: Aayan.** Copy everything below the line into your coding agent.
 
 ---
 
-You are working on HomeShield, a hackathon demo (NVIDIA Hack for Impact, Sheffield, today). It has a React + TypeScript + Vite frontend in `frontend/`, with a deck.gl and MapLibre map in the `TwinMap` component. Read `docs/ui-rework/README.md` first: it lists the shared rules, the backend API, and Step 0 (the frontend source must be committed before you start). Work on a new branch from `main`.
+You are working on HomeShield, a hackathon demo (NVIDIA Hack for Impact, Sheffield, today). It has a React + TypeScript + Vite frontend in `frontend/`, with a deck.gl and MapLibre map in the `TwinMap` component. Read `docs/ui-rework/README.md` first: it lists the shared rules and the backend API. Work on a new branch from `main`.
+
+**Before you start:** pull `main` and check that `frontend/src/` contains the real dashboard source, for example a `TwinMap` component and `src/lib/theme.ts`, not just the 14-line starter `main.tsx`. Enan (workstream A) is uploading it as his Step 0. If it isn't there yet, stop and say so; do not try to edit the compiled `mock-build/` bundle.
 
 **You own:** the `TwinMap` component and everything drawn on the map: layers, layer toggles, map legend, map tooltips and popups, camera. **Do not change** the app layout or tabs (workstream A, which merges first, so rebase onto it) or the case list and cards (workstream C). Read live plan and worker data through workstream C's data layer once it lands; until then, use the existing mock data.
 

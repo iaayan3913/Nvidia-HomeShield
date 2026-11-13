@@ -2,17 +2,17 @@
 
 Operator feedback on the dashboard, split into three parallel workstreams. Each workstream has its own agent prompt; [CHECKLIST.md](CHECKLIST.md) tracks all three.
 
-| Workstream | Prompt | Owns |
-|---|---|---|
-| A: Shell, tabs and resident report | [PROMPT-A-shell-and-resident-report.md](PROMPT-A-shell-and-resident-report.md) | App layout and navigation, Schedule tab, Agent activity drawer, `/report` page for phones, device and network setup |
-| B: Map | [PROMPT-B-map.md](PROMPT-B-map.md) | Twin map layers: hotspots removed, routes on demand, zoom-aware labels, live plan on the map, offline basemap fallback |
-| C: Cases, text and status | [PROMPT-C-cases-and-declutter.md](PROMPT-C-cases-and-declutter.md) | Case list and cards, header and counters, replacing "PLAN vN", live data layer (cases, plans, events) |
+| Workstream | Owner | Prompt | Owns |
+|---|---|---|---|
+| A: Shell, tabs and resident report | Enan | [PROMPT-A-shell-and-resident-report.md](PROMPT-A-shell-and-resident-report.md) | App layout and navigation, Schedule tab, Agent activity drawer, `/report` page for phones, device and network setup |
+| B: Map | Aayan | [PROMPT-B-map.md](PROMPT-B-map.md) | Twin map layers: hotspots removed, routes on demand, zoom-aware labels, live plan on the map, offline basemap fallback |
+| C: Cases, text and status | Person C | [PROMPT-C-cases-and-declutter.md](PROMPT-C-cases-and-declutter.md) | Case list and cards, header and counters, replacing "PLAN vN", live data layer (cases, plans, events) |
 
 ## Step 0, blocking everyone: commit the frontend source
 
 `main` only contains the **compiled** dashboard (`frontend/mock-build/`). Its source (the `TwinMap` component, `src/lib/theme.ts`, the mock data and so on) has never been committed: `frontend/src/` still holds the 14-line starter `main.tsx`. Nobody can change the UI until the source is in git.
 
-The author of the "web done" commit (Enan) should:
+Enan's agent does this as **Step 0 of Prompt A**, before any UI changes. The detailed steps are in that prompt; in short:
 
 1. Commit the full frontend source: everything under `frontend/src/`, plus `vite.config.*`, `index.html`, `public/` assets and any mock-data files. Leave out `node_modules/` and `dist/`.
 2. Check that `npm install && npm run dev` in `frontend/` shows the same dashboard as `npm run mock`.

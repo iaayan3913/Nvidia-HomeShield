@@ -1,20 +1,20 @@
 # UI rework checklist
 
-Times are targets for today, 13 Nov. The 16:00 feature freeze from `PLAN.md` still applies. Write each workstream owner's name next to its letter.
+Times are targets for today, 13 Nov. The 16:00 feature freeze from `PLAN.md` still applies. Owners: **A = Enan**, **B = Aayan**, **C = Person C** (replace with their name).
 
 | Workstream | Owner | Items | Done |
 |---|---|---:|---:|
-| Step 0: source in git | Enan | 3 | 0 |
-| A: shell, tabs, resident report | | 8 | 0 |
-| B: map | | 7 | 0 |
-| C: cases, text, status, data layer | | 7 | 0 |
+| Step 0: source in git | Enan (A) | 3 | 0 |
+| A: shell, tabs, resident report | Enan | 8 | 0 |
+| B: map | Aayan | 7 | 0 |
+| C: cases, text, status, data layer | Person C | 7 | 0 |
 | Shared gates | all | 4 | 0 |
 
 ## Step 0: blocking (as soon as possible)
 
-- [ ] **[Enan]** Commit the full frontend source (`frontend/src/**`, `vite.config.*`, mock data). Done when it is on `main`.
-- [ ] **[Enan]** `npm run dev` shows the same dashboard as `npm run mock`. Done when a second person confirms it on their laptop.
-- [ ] **[A, B, C]** Each owner branches from that commit. Done when all three branches exist.
+- [ ] **[Enan (A)]** Find the dashboard source on his laptop and commit it to `frontend/`: `src/**`, `vite.config.*`, `tsconfig*`, `package.json` and `package-lock.json` (with maplibre-gl, @fontsource and React 19), mock data. Done when it is merged to `main`.
+- [ ] **[Enan (A)]** A clean clone builds (`npm ci && npm run build`), and `npm run dev` shows the same dashboard as `npm run mock`. Done when Aayan or Person C confirms it on their own laptop.
+- [ ] **[Enan, Aayan, Person C]** Each owner branches from that commit. Done when all three branches exist.
 
 ## A: shell, tabs and resident report
 

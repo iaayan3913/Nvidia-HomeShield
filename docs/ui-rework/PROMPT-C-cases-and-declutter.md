@@ -1,10 +1,12 @@
 # Prompt C: case list, less text, and schedule status
 
-Copy everything below the line into your coding agent.
+**Owner: Person C.** Copy everything below the line into your coding agent.
 
 ---
 
-You are working on HomeShield, a hackathon demo (NVIDIA Hack for Impact, Sheffield, today). It has a React + TypeScript + Vite frontend in `frontend/` and a FastAPI backend in `backend/`. Read `docs/ui-rework/README.md` first: it lists the shared rules, the backend API, and Step 0 (the frontend source must be committed before you start). Work on a new branch from `main`.
+You are working on HomeShield, a hackathon demo (NVIDIA Hack for Impact, Sheffield, today). It has a React + TypeScript + Vite frontend in `frontend/` and a FastAPI backend in `backend/`. Read `docs/ui-rework/README.md` first: it lists the shared rules and the backend API. Work on a new branch from `main`.
+
+**Before you start:** pull `main` and check that `frontend/src/` contains the real dashboard source, for example a `TwinMap` component and `src/lib/theme.ts`, not just the 14-line starter `main.tsx`. Enan (workstream A) is uploading it as his Step 0. If it isn't there yet, stop and say so; do not try to edit the compiled `mock-build/` bundle.
 
 **You own:** the case list and case cards on the left, the case detail panel, the header counters and status strip, toasts and notifications, the contents of the "Today's schedule" component (workstream A moves it into a Schedule tab; you trim what is inside), and the **shared live data layer** (one module the whole app reads cases, plans, workers, approvals and SSE events from). **Do not change** map layers (workstream B) or the layout, tabs and resident page (workstream A, which merges first, so rebase onto it).
 
