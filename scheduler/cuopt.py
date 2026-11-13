@@ -1,9 +1,10 @@
 """NVIDIA cuOpt adapter (GPU). Same inputs/outputs as OR-Tools and the mock.
 
-VERIFY on the Spark before relying on it:
-  * cuOpt installs and imports on aarch64 (`python3 -m scheduler.cuopt` prints status)
-  * the Python API names used below (cuopt.routing.DataModel, SolverSettings, Solve,
-    get_route column names) match the installed version.
+Install on the Spark (CUDA 13, aarch64 is a supported platform):
+    bash scripts/spark/check_cuopt.sh
+The DataModel/SolverSettings/Solve calls and get_route() columns below were checked
+against the cuOpt Python routing API reference (docs.nvidia.com/cuopt). Still VERIFY
+on the Spark: the installed version solves the fixtures (`python3 -m scheduler.cuopt`).
 Any exception here is caught by FallbackScheduler, which moves on to OR-Tools/mock.
 cuOpt only decides assignment and order; ETAs/slack/conflicts are recomputed by
 scheduler.core so every solver's Plan has identical semantics.
@@ -57,14 +58,15 @@ class CuOptScheduler(BaseScheduler):
         model.set_order_prizes(cudf.Series([PRIZE * max(1, problem.priority[j]) ** 2 for j in orders], dtype="float32"))
         starts = cudf.Series(list(range(n_w)), dtype="int32")
         model.set_vehicle_locations(starts, starts)
-        model.set_drop_return_trips(cudf.Series([True] * n_w))  # VERIFY: workers end at their last job
+        model.set_drop_return_trips(cudf.Series([True] * n_w))  # workers end at their last job
         model.set_vehicle_time_windows(cudf.Series([min(s, e) for s, e in problem.shift], dtype="int32"),
                                        cudf.Series([e for _, e in problem.shift], dtype="int32"))
         for v in range(n_w):
             allowed = [k for k, j in enumerate(orders) if v in problem.eligible[j]]
             if allowed:
                 model.add_vehicle_order_match(v, cudf.Series(allowed, dtype="int32"))
-        # VERIFY: warm start via model.add_initial_solutions(...) if the installed version supports it.
+        # Warm start is not passed to cuOpt (add_initial_solutions needs per-stop type codes we have not
+        # verified); replan() still locks started visits and cuOpt re-solves the rest within the time limit.
 
         settings = routing.SolverSettings()
         settings.set_time_limit(max(0.1, self.time_limit_s))
@@ -72,14 +74,25 @@ class CuOptScheduler(BaseScheduler):
         if solution.get_status() != 0:
             raise RuntimeError(f"cuOpt status {solution.get_status()}: {solution.get_message()}")
 
-        frame = solution.get_route().to_pandas()  # VERIFY columns: truck_id, route, type, arrival_stamp
-        routes: list[list[int]] = [[] for _ in range(n_w)]
-        for _, row in frame.sort_values(["truck_id", "arrival_stamp"]).iterrows():
-            if str(row.get("type", "")).lower() not in ("delivery", "task", "order"):
-                continue
-            order_index = int(row["route"])
-            routes[int(row["truck_id"])].append(orders[order_index])
-        return routes
+        return routes_from_rows(solution.get_route().to_pandas().to_dict("records"), n_w, len(problem.jobs))
+
+
+def routes_from_rows(rows: list[dict], n_workers: int, n_jobs: int) -> list[list[int]]:
+    """Turn cuOpt get_route() rows into per-worker job-index lists.
+
+    Documented columns: route, arrival_stamp, truck_id, location. `location` (and
+    `route`) hold *location* indices, not order numbers. Every job has its own
+    location (n_workers + job index), so a location maps straight back to a job;
+    worker start/return locations (< n_workers) are skipped. Row order is the
+    visit order, so rows are only grouped by truck (stable), never re-sorted.
+    """
+    routes: list[list[int]] = [[] for _ in range(n_workers)]
+    for row in rows:
+        location = int(row["location"] if "location" in row else row["route"])
+        job = location - n_workers
+        if 0 <= job < n_jobs and job not in routes[int(row["truck_id"])]:
+            routes[int(row["truck_id"])].append(job)
+    return routes
 
 
 if __name__ == "__main__":

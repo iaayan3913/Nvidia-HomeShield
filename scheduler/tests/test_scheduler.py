@@ -141,3 +141,16 @@ def test_service_adds_emergency_case_and_replans():
     assert "job-c-gas" not in plan.unassigned_jobs
     assert diff["added"][0]["job_id"] == "job-c-gas"
     assert plan.id != before.id
+
+
+def test_cuopt_route_rows_map_locations_back_to_jobs():
+    from scheduler.cuopt import routes_from_rows
+    # 2 workers (locations 0-1), 3 jobs (locations 2-4); documented get_route() columns.
+    rows = [
+        {"route": 0, "arrival_stamp": 0.0, "truck_id": 0, "location": 0},   # worker 0 start
+        {"route": 4, "arrival_stamp": 12.0, "truck_id": 0, "location": 4},  # job 2
+        {"route": 2, "arrival_stamp": 90.0, "truck_id": 0, "location": 2},  # job 0
+        {"route": 1, "arrival_stamp": 0.0, "truck_id": 1, "location": 1},   # worker 1 start
+        {"route": 3, "arrival_stamp": 20.0, "truck_id": 1, "location": 3},  # job 1
+    ]
+    assert routes_from_rows(rows, n_workers=2, n_jobs=3) == [[2, 0], [1]]

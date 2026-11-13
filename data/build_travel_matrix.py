@@ -15,9 +15,9 @@ import math
 from time import perf_counter
 
 try:
-    from data.sheffield import GENERATED_DIR, ensure_repo_on_path
+    from data.sheffield import GENERATED_DIR, ensure_repo_on_path, nearest_graph_nodes
 except ImportError:  # run as `py data/build_travel_matrix.py`
-    from sheffield import GENERATED_DIR, ensure_repo_on_path
+    from sheffield import GENERATED_DIR, ensure_repo_on_path, nearest_graph_nodes
 
 ensure_repo_on_path()
 from data.generate_properties import generate_properties  # noqa: E402
@@ -39,6 +39,7 @@ def haversine_matrix(points: list[dict]) -> list[list[int]]:
 def osmnx_matrix(points: list[dict]) -> list[list[int]]:
     import networkx as nx
     import osmnx as ox
+    ox.settings.cache_folder = str(GENERATED_DIR / "osmnx_cache")  # keep downloads out of the repo root
     graph_path = GENERATED_DIR / "sheffield_drive.graphml"
     if graph_path.exists():
         graph = ox.load_graphml(graph_path)
@@ -46,7 +47,7 @@ def osmnx_matrix(points: list[dict]) -> list[list[int]]:
         graph = ox.graph_from_place("Sheffield, UK", network_type="drive")
         ox.save_graphml(graph, graph_path)
     graph = ox.add_edge_travel_times(ox.add_edge_speeds(graph))
-    nodes = ox.distance.nearest_nodes(graph, [p["lon"] for p in points], [p["lat"] for p in points])
+    nodes = nearest_graph_nodes(graph, [p["lat"] for p in points], [p["lon"] for p in points])
     matrix = []
     for i, source in enumerate(nodes):
         lengths = nx.single_source_dijkstra_path_length(graph, source, weight="travel_time")

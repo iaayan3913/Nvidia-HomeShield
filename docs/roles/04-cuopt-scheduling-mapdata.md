@@ -16,7 +16,14 @@ py -m scheduler.benchmark --export    # before/after gas emergency for every sol
 py -m pytest scheduler/tests -q
 ```
 
-On Spark, `py` becomes `python3`; test cuOpt separately with `python3 -m scheduler.cuopt` (prints import status, then solves the fixtures). `VERIFY:` aarch64 installation and exact cuOpt API. If it fails, keep the same `Scheduler` interface and use OR-Tools or the deterministic mock.
+On Spark, `py` becomes `python3`. One command checks the GPU, optionally installs cuOpt, solves the fixtures with cuOpt and benchmarks every solver, saving the output to `data/generated/cuopt_status.txt`:
+
+```bash
+PYTHON=~/cuopt-env/bin/python bash scripts/spark/check_cuopt.sh --deps   # first run: adds pydantic + ortools
+PYTHON=~/cuopt-env/bin/python bash scripts/spark/check_cuopt.sh          # afterwards
+```
+
+The adapter's API calls were checked against the cuOpt Python routing reference (`get_route()` returns `route`, `arrival_stamp`, `truck_id`, `location`; status 0 = success). `VERIFY:` that the pip package (`cuopt-cu13`, or `cuopt-cu12` on CUDA 12) installs on the Spark; the fallback is the `nvidia/cuopt` container. If it fails, nothing changes for the demo: the same `Scheduler` interface falls back to OR-Tools, then the mock.
 
 ## Contract and checkpoints
 
@@ -25,9 +32,9 @@ Return ordered stops, ETAs, slack, unassigned jobs, conflicts, solver name, and 
 ## Checklist
 
 - [x] Eight workers and at least 30 jobs are generated (36, deterministic, seed 44).
-- [x] 300-500 properties and local road GeoJSON are available (400 properties; roads = synthetic fallback until OSMnx runs).
-- [x] Travel matrix has an OSMnx path or labelled haversine fallback (`haversine_x1.3_at_25kmh`).
-- [ ] cuOpt status is recorded on the Spark (`python3 -m scheduler.cuopt`).
+- [x] 300-500 properties and local road GeoJSON are available (400 properties; real OSMnx roads verified on the dev laptop, synthetic fallback otherwise).
+- [x] Travel matrix has an OSMnx path or labelled haversine fallback (`haversine_x1.3_at_25kmh`); OSMnx path verified (`osmnx_drive_travel_time`).
+- [x] cuOpt status is recorded on the Spark: cuOpt 26.10.1 (cu13) in `~/cuopt-env`, `from cuopt import routing` OK (Person 1, 13 Nov). Fixture solve: pending `check_cuopt.sh`.
 - [x] OR-Tools/mock fallback has identical inputs and outputs.
 - [x] Emergency re-plan reports solver time and conflicts.
 
@@ -67,8 +74,13 @@ If `case.property_id` is missing or unknown, `add_case` assigns a stable synthet
 - `frontend/public/roads.geojson`: generated locally (gitignored). Check `metadata.source`; `synthetic` = straight district links, not real roads.
 - `frontend/public/sample-plans.json`: real OR-Tools `before` / `after` Plans for the 11:00 S2 gas emergency, plus `workers`, `jobs`, `emergency_job` and `diff` — enough to build route animation fully offline before the API is wired.
 
-## Status (13 Nov, morning)
+## Status (13 Nov, late morning)
 
-- No cuOpt or OSMnx on the Windows dev laptop; OR-Tools 9.15 and the mock both pass validation on the fixtures.
-- Benchmark (8 workers, 36 jobs, gas emergency at 11:00): OR-Tools ≈1.0 s (it uses its full time limit; tune `SCHEDULER_TIME_LIMIT_S`), mock ≈20 ms; 0 unassigned and 0 conflicts before and after; OR-Tools moves 2 jobs to absorb the emergency.
-- Next: run `python3 -m scheduler.cuopt` and `data/export_roads_geojson.py` on the Spark, record the results here, and rebuild the travel matrix from OSMnx.
+- OSMnx 2.1 works on the Windows dev laptop (`pip install osmnx`; needs internet once). `export_roads_geojson.py` wrote 21,637 road segments (5.8 MB; `--major` gives 5,425 segments, 1.5 MB) and cached `data/generated/sheffield_drive.graphml`; `build_travel_matrix.py` built the 408×408 matrix in 20 s. Nearest-node lookup uses numpy, so scikit-learn is not needed.
+- OSM travel times are free-flow (speed limits, no traffic or parking): median 10 min between properties, max 54 min, about 0.54× the conservative haversine fallback. Both files are gitignored, so each machine builds its own; the scheduler reports which one it used (`travel_source`).
+- Benchmark (8 workers, gas emergency at 11:00): OR-Tools ≈1.0 s at 30, 40 and 50 jobs (it uses its full time limit; tune `SCHEDULER_TIME_LIMIT_S`), mock < 30 ms; every plan validates and the emergency is always assigned. At 40–50 jobs some routine jobs are unassigned: that is the 8-worker day being full, reported as conflicts.
+- How many *other* jobs move to absorb the emergency varies with the travel matrix, the time of day and OR-Tools' time-limited search (0–10 in tests); the receiving worker's route always changes and nothing is dropped at 11:00.
+- cuOpt adapter checked against the cuOpt Python routing API reference; fixed route parsing (`get_route()` returns location indices, not order ids). Not yet run on a GPU.
+- cuOpt 26.10.1 (cu13) installed on the Spark by Person 1 in `~/cuopt-env`; import check OK.
+- Backend integration done by Fowzan (Person 3): `HomeShieldService` uses `get_scheduler()`, `SchedulingService`, `case_to_job` and warm-start `replan()` (`backend/tests/test_scheduler_integration.py`).
+- Next: on the Spark, `PYTHON=~/cuopt-env/bin/python bash scripts/spark/check_cuopt.sh --deps`, then paste `data/generated/cuopt_status.txt` here.

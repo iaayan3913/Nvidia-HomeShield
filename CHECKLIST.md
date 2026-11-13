@@ -5,7 +5,7 @@
 | Person 1 | 8 | 0 | 0% | not started |
 | Person 2 | 7 | 0 | 0% | not started |
 | Person 3 | 9 | 0 | 0% | not started |
-| Person 4 | 8 | 6 | 75% | in progress |
+| Person 4 | 8 | 8 | 100% | done |
 | Person 5 | 9 | 0 | 0% | not started |
 
 ## Person 1 — Spark, models and NemoClaw
@@ -46,9 +46,9 @@
 - [x] **[Person 4 | 10:00-10:30]** Create 8 workers and 30 jobs; done when deterministic fixtures load.
 - [x] **[Person 4 | 10:30-11:00]** Generate 300-500 properties; done when local GeoJSON is rendered.
 - [x] **[Person 4 | 11:00-11:30]** Export roads or labelled haversine fallback; done when `roads.geojson` exists.
-- [ ] **[Person 4 | 11:30-12:30]** Install/test cuOpt on Spark; done when import status is recorded.
+- [x] **[Person 4 | 11:30-12:30]** Install/test cuOpt on Spark; done when import status is recorded.
 - [x] **[Person 4 | 12:30-13:00]** Implement `optimise_schedule()` and validation; done when mock Plan is valid.
-- [ ] **[Person 4 | 13:00 checkpoint]** Integrate scheduler interface; done when backend can request a Plan.
+- [x] **[Person 4 | 13:00 checkpoint]** Integrate scheduler interface; done when backend can request a Plan.
 - [x] **[Person 4 | 13:00-15:00]** Implement emergency re-optimisation and benchmark; done when solver time is shown.
 - [x] **[Person 4 | 15:00 checkpoint]** Keep OR-Tools/mock fallback ready; done when a new emergency never blocks the demo.
 
