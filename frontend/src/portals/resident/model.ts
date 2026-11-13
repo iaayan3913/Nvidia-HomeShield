@@ -40,60 +40,88 @@ export const CONTACT_METHODS: Array<{ id: Extract<ContactMethod, 'phone' | 'text
   { id: 'text', label: 'Text message' },
 ];
 
+/** The minimum we keep about a home chosen from search results. */
+export interface ChosenHome { id: string; display_address: string; postcode: string; area?: string }
+
 export interface ReportDraft {
   category: ResidentCategoryId | '';
   room: string;
   description: string;
-  propertyId: string;
+  addressMode: 'search' | 'manual';
+  searchQuery: string;
+  home: ChosenHome | null;
+  addressLine: string;
+  postcode: string;
   name: string;
   phone: string;
   preferredContact: ContactMethod | '';
   accessNotes: string;
 }
 
-export const emptyDraft = (): ReportDraft => ({ category: '', room: '', description: '', propertyId: '', name: '', phone: '', preferredContact: '', accessNotes: '' });
+export const emptyDraft = (): ReportDraft => ({ category: '', room: '', description: '', addressMode: 'search', searchQuery: '', home: null, addressLine: '', postcode: '', name: '', phone: '', preferredContact: '', accessNotes: '' });
 
 export const STEPS = [
-  { id: 'problem', label: 'Problem' },
-  { id: 'evidence', label: 'Evidence' },
-  { id: 'details', label: 'Home and contact' },
-  { id: 'review', label: 'Review' },
+  { id: 'problem', label: 'Problem', title: 'What is the problem?' },
+  { id: 'evidence', label: 'Photo or voice', title: 'Add a photo or a voice note' },
+  { id: 'home', label: 'Your home', title: 'Find your home' },
+  { id: 'contact', label: 'Contact', title: 'How can we contact you?' },
+  { id: 'review', label: 'Review', title: 'Check and send your report' },
 ] as const;
-export type StepIndex = 0 | 1 | 2 | 3;
+export type StepIndex = 0 | 1 | 2 | 3 | 4;
+export const LAST_STEP: StepIndex = 4;
 
-export type FieldErrors = Partial<Record<keyof ReportDraft | 'evidence', string>>;
+export type FieldErrors = Partial<Record<'category' | 'description' | 'evidence' | 'home' | 'addressLine' | 'postcode' | 'name' | 'phone' | 'preferredContact', string>>;
+export const FIELD_STEP: Record<keyof FieldErrors, StepIndex> = { category: 0, description: 0, evidence: 1, home: 2, addressLine: 2, postcode: 2, name: 3, phone: 3, preferredContact: 3 };
 
 export interface EvidenceSummary { photos: number; voiceNotes: number }
 
 const phoneDigits = (value: string) => value.replace(/\D/g, '');
+/** Loose UK postcode shape, e.g. S1 2AB, SW1A 1AA, M11AE. Not a check that the postcode exists. */
+export const UK_POSTCODE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
+export const normalisePostcode = (value: string) => {
+  const compact = value.replace(/\s+/g, '').toUpperCase();
+  return compact.length > 3 ? `${compact.slice(0, -3)} ${compact.slice(-3)}` : compact;
+};
 
-export function validateStep(step: StepIndex, draft: ReportDraft, evidence: EvidenceSummary): FieldErrors {
+function validateOne(step: StepIndex, draft: ReportDraft, evidence: EvidenceSummary): FieldErrors {
   const errors: FieldErrors = {};
   const description = draft.description.trim();
-  if (step === 0 || step === 3) {
+  if (step === 0) {
     if (!draft.category) errors.category = 'Choose the type of problem.';
     if (description && description.length < 10) errors.description = 'Add a little more detail (at least 10 characters), or leave this blank and add a photo or voice note next.';
   }
-  if (step === 1 || step === 3) {
-    if (!description && evidence.photos + evidence.voiceNotes === 0) errors.evidence = 'Add a photo or voice note, or go back and describe the problem in writing.';
+  if (step === 1 && !description && evidence.photos + evidence.voiceNotes === 0) errors.evidence = 'Add a photo or voice note, or go back and describe the problem in writing.';
+  if (step === 2) {
+    if (draft.addressMode === 'search') {
+      if (!draft.home) errors.home = 'Search for your postcode or address and choose your home from the list, or choose “My address isn’t listed”.';
+    } else {
+      if (draft.addressLine.trim().length < 3) errors.addressLine = 'Enter the first line of your address, for example 12 Example Street.';
+      if (!draft.postcode.trim()) errors.postcode = 'Enter your postcode.';
+      else if (!UK_POSTCODE.test(draft.postcode.trim())) errors.postcode = 'Enter a full UK postcode, like S1 2AB.';
+    }
   }
-  if (step === 2 || step === 3) {
-    if (!draft.propertyId) errors.propertyId = 'Choose the demonstration property.';
+  if (step === 3) {
     if (draft.name.trim().length < 2) errors.name = 'Enter your name.';
     const digits = phoneDigits(draft.phone);
-    if (!draft.phone.trim()) errors.phone = 'Enter a contact number.';
+    if (!draft.phone.trim()) errors.phone = 'Enter a phone number so the repairs team can arrange a visit.';
     else if (!/^[+\d\s()-]+$/.test(draft.phone.trim()) || digits.length < 10 || digits.length > 13) errors.phone = 'Enter a UK phone number, like 07700 900123.';
     if (!draft.preferredContact) errors.preferredContact = 'Choose how you would like us to contact you.';
   }
   return errors;
 }
 
-/** Text sent to the mock service. Mapped categories keep their resident-facing label so officers see it. */
+/** Validates one step, or every step when `step` is the review step. */
+export function validateStep(step: StepIndex, draft: ReportDraft, evidence: EvidenceSummary): FieldErrors {
+  if (step !== LAST_STEP) return validateOne(step, draft, evidence);
+  return ([0, 1, 2, 3] as StepIndex[]).reduce<FieldErrors>((all, s) => ({ ...all, ...validateOne(s, draft, evidence) }), {});
+}
+
+/** Text sent to the service. Mapped categories keep their resident-facing label so officers see it. */
 export function composeReportText(draft: ReportDraft): string {
   const category = categoryById(draft.category);
   const description = draft.description.trim();
   const parts: string[] = [];
-  if (category && category.hazard === 'other' && category.id !== 'other') parts.push(`${category.label}: ${description || 'reported with photo or voice evidence'}`);
+  if (category && category.hazard === 'other' && category.id !== 'other') parts.push(`${category.label}: ${description || 'reported with a photo or voice note'}`);
   else if (description) parts.push(description);
   if (draft.room) parts.push(`Room: ${draft.room}.`);
   return parts.join(' ');
