@@ -13,7 +13,7 @@ from pathlib import Path
 
 from backend.schemas import Case, HazardType, Job, Severity, Skill, Worker
 
-from .core import utcnow
+from .core import naive_utc, utcnow
 
 GENERATED = Path(__file__).resolve().parents[1] / "data" / "generated"
 
@@ -81,13 +81,14 @@ def property_location(property_id: str | None) -> tuple[float, float] | None:
 
 def case_to_job(case: Case, now: datetime | None = None, lat: float | None = None, lon: float | None = None) -> Job:
     """Map a Case to a schedulable Job. Location comes from the property stock unless given."""
-    now = now or utcnow()
+    now = naive_utc(now) or utcnow()
     if lat is None or lon is None:
         location = property_location(case.property_id)
         if location is None:
             raise ValueError(f"case {case.id}: unknown property {case.property_id!r}; pass lat/lon")
         lat, lon = location
-    deadline = case.deadlines.make_safe_by or case.deadlines.investigate_by or case.deadlines.start_works_by
+    deadline = naive_utc(case.deadlines.make_safe_by or case.deadlines.investigate_by
+                         or case.deadlines.start_works_by)
     if case.is_emergency or case.severity == Severity.emergency:
         target = now + timedelta(minutes=EMERGENCY_TARGET_MINUTES)
         deadline = min(deadline, target) if deadline else target

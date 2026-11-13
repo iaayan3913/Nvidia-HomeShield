@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from threading import RLock
 from uuid import uuid4
 
 from agent.rules import compute_deadlines
-from backend.config import DATABASE_PATH, INTAKE_ADAPTER, INTAKE_AUDIO_ENABLED, SCHEDULER_ADAPTER
+from backend.config import (
+    DATABASE_PATH, INTAKE_ADAPTER, INTAKE_AUDIO_ENABLED, SCHEDULER_ADAPTER,
+    SCHEDULER_SEED_JOBS, SCHEDULER_TIME_LIMIT_S,
+)
 from backend.schemas import (
     AgentEvent, Approval, ApprovalStatus, Case, CasePatch, CaseStatus, DecisionIn, Evidence,
-    HazardType, Job, Plan, ReportIn, Severity, Skill, Worker, utc_now,
+    HazardType, Plan, ReportIn, Severity, utc_now,
 )
 from intake.agent import analyse_report
-from scheduler.cuopt import CuOptScheduler
-from scheduler.mock import MockScheduler
-from scheduler.ortools import OrToolsScheduler
+from scheduler import diff_plans, get_scheduler, validate_plan
+from scheduler.fixtures import case_to_job
+from scheduler.service import SchedulingService
 from store.sqlite import Store
 from backend.uploads import StoredUpload, UploadStore
 
@@ -22,35 +24,27 @@ def _event_id() -> str:
     return f"event-{uuid4().hex}"
 
 
-def _skill(case: Case) -> Skill:
-    return {
-        HazardType.damp_mould: Skill.damp_mould,
-        HazardType.leak: Skill.plumbing,
-        HazardType.electrical: Skill.electrical,
-        HazardType.gas: Skill.gas,
-        HazardType.fire: Skill.fire,
-    }.get(case.hazard_type, Skill.general)
-
-
 class HomeShieldService:
     def __init__(self, store: Store | None = None, scheduler=None, *, intake=None,
                  intake_adapter: str = INTAKE_ADAPTER, upload_store: UploadStore | None = None,
-                 intake_audio_enabled: bool = INTAKE_AUDIO_ENABLED):
+                 intake_audio_enabled: bool = INTAKE_AUDIO_ENABLED,
+                 scheduler_adapter: str = SCHEDULER_ADAPTER,
+                 scheduler_seed_jobs: bool = SCHEDULER_SEED_JOBS):
         self.store = store or Store(DATABASE_PATH)
-        self.scheduler = scheduler or self._scheduler()
+        self.scheduler_adapter = scheduler_adapter
+        self.scheduler = scheduler or get_scheduler(scheduler_adapter, SCHEDULER_TIME_LIMIT_S)
+        self.scheduling = SchedulingService(scheduler=self.scheduler, seed_jobs=scheduler_seed_jobs)
         self.intake = intake or analyse_report
         self.intake_adapter = intake_adapter
         self.upload_store = upload_store or UploadStore()
         self.intake_audio_enabled = intake_audio_enabled
         self._decision_lock = RLock()
 
-    @staticmethod
-    def _scheduler():
-        if SCHEDULER_ADAPTER == "cuopt":
-            return CuOptScheduler()
-        if SCHEDULER_ADAPTER == "ortools":
-            return OrToolsScheduler()
-        return MockScheduler()
+    def scheduler_status(self) -> dict:
+        chain = getattr(self.scheduler, "chain", [self.scheduler])
+        return {"requested": self.scheduler_adapter,
+                "chain": [getattr(item, "name", type(item).__name__) for item in chain],
+                "time_limit_s": SCHEDULER_TIME_LIMIT_S}
 
     def emit(self, event_type: str, summary: str, case_id: str | None = None,
              *, tool_name: str | None = None, payload: dict | None = None,
@@ -144,38 +138,60 @@ class HomeShieldService:
             else:
                 case.evidence.append(Evidence(kind=media.kind, uri=media.reference, description=description))
 
-    def _workers(self) -> list[Worker]:
-        now = utc_now()
-        return [
-            Worker(id="worker-general", name="Demo General Team", skills=[Skill.general, Skill.damp_mould, Skill.plumbing],
-                   shift_start=now, shift_end=now + timedelta(hours=8), lat=53.3811, lon=-1.4701),
-            Worker(id="worker-safety", name="Demo Safety Team", skills=[Skill.gas, Skill.fire, Skill.electrical],
-                   shift_start=now, shift_end=now + timedelta(hours=8), lat=53.385, lon=-1.465),
-        ]
-
-    def _jobs(self) -> list[Job]:
-        jobs: list[Job] = []
+    def _jobs_for_proposal(self) -> list:
+        jobs = dict(self.scheduling.jobs)
+        now = self.scheduling.clock.now()
         for case in self.store.list_cases():
-            if case.status in {CaseStatus.resolved, CaseStatus.in_progress}:
+            if case.status == CaseStatus.resolved:
                 continue
-            # Coordinates are operational placeholders for the replaceable scheduler fixture, not resident data.
-            jobs.append(Job(id=f"job-{case.id}", case_id=case.id, required_skill=_skill(case),
-                            lat=53.38, lon=-1.47, earliest=utc_now(), latest=case.deadlines.investigate_by,
-                            priority=100 if case.is_emergency else 10 if case.severity == Severity.significant else 1))
-        return jobs
+            previous_property = case.property_id
+            self.scheduling.resolve_property(case)
+            if case.property_id != previous_property:
+                self.store.save_case(case, "Scheduler assigned a synthetic demo property")
+            job = case_to_job(case, now=now)
+            jobs[job.id] = job
+        return list(jobs.values())
 
     def propose_plan(self, case_id: str, *, emergency: bool = False) -> Plan:
         self.emit("agent.tool_requested", "Schedule proposal requested", case_id, tool_name="schedule_job")
+        if emergency:
+            self.emit("plan.replan_started", "Emergency schedule re-planning started", case_id,
+                      payload={"active_plan_id": getattr(self.store.latest_active_plan(), "id", None)})
         try:
-            plan = self.scheduler.optimise_schedule(self._workers(), self._jobs())
+            active = self.store.latest_active_plan()
+            jobs = self._jobs_for_proposal()
+            now = self.scheduling.clock.now()
+            if active:
+                plan = self.scheduler.replan(active, self.scheduling.workers, jobs, now)
+            else:
+                plan = self.scheduler.optimise_schedule(self.scheduling.workers, jobs)
             plan = Plan.model_validate(plan)
+            errors = validate_plan(plan, self.scheduling.workers, jobs)
+            if errors:
+                raise RuntimeError("scheduler returned an invalid plan: " + "; ".join(errors[:3]))
+            plan.approved = False
             self.store.save_plan(plan)
-            self.emit("plan.updated" if emergency else "plan.proposed", "Schedule proposal created", case_id,
-                      tool_name="schedule_job", payload={"plan_id": plan.id, "solver": plan.solver,
-                                                         "unassigned_jobs": plan.unassigned_jobs}, success=True)
+            changes = diff_plans(active, plan)
+            meta = {**getattr(self.scheduler, "last_meta", {}), **self.scheduler_status()}
+            payload = {"plan_id": plan.id, "solver": plan.solver, "solver_ms": plan.solver_ms,
+                       "unassigned_jobs": plan.unassigned_jobs, "conflicts": plan.conflicts,
+                       "changes": changes, "scheduler": meta, "plan": plan.model_dump(mode="json")}
+            self.emit("plan.proposed", "Schedule proposal created", case_id,
+                      tool_name="schedule_job", payload=payload, success=True)
+            if emergency:
+                self.emit("plan.replan_completed", "Emergency schedule re-planning completed", case_id,
+                          payload=payload, success=True)
+                self.emit("plan.updated", "Emergency schedule proposal updated", case_id,
+                          payload=payload, success=True)
+            if plan.unassigned_jobs or plan.conflicts:
+                self.emit("plan.conflicts", "Schedule proposal contains unassigned jobs or conflicts", case_id,
+                          payload={"plan_id": plan.id, "unassigned_jobs": plan.unassigned_jobs,
+                                   "conflicts": plan.conflicts}, success=False)
             self.emit("agent.tool_completed", "Scheduling tool completed", case_id, tool_name="schedule_job", success=True)
             return plan
         except Exception as exc:
+            self.emit("plan.failed", "Scheduling failed", case_id, success=False,
+                      payload={"error_type": type(exc).__name__, "requested_adapter": self.scheduler_adapter})
             self.emit("agent.tool_failed", "Scheduling tool failed", case_id, tool_name="schedule_job", success=False,
                       payload={"error_type": type(exc).__name__})
             raise RuntimeError("scheduler could not produce a plan") from exc
@@ -201,6 +217,10 @@ class HomeShieldService:
             if approve:
                 self._execute_approval(approval)
             self.store.save_approval(approval)
+            if not approve and approval.action in {"commit_plan", "schedule_job"}:
+                self.emit("plan.rejected", "Schedule proposal rejected", approval.case_id,
+                          payload={"plan_id": approval.payload.get("plan_id"),
+                                   "approval_id": approval.id}, success=False)
             self.emit("approval.approved" if approve else "approval.rejected",
                       "Human approval recorded", approval.case_id,
                       payload={"approval_id": approval.id, "action": approval.action})
@@ -212,10 +232,17 @@ class HomeShieldService:
         case = self.require_case(approval.case_id)
         if approval.action in {"commit_plan", "schedule_job"}:
             plan_id = approval.payload.get("plan_id")
-            plan = next((item for item in self.store.list_plans() if item.id == plan_id), self.store.latest_plan())
-            if plan:
-                plan.approved = True
-                self.store.save_plan(plan)
+            plan = self.store.get_plan(plan_id) if plan_id else self.store.latest_plan()
+            if not plan:
+                raise ValueError("proposed plan not found")
+            plan.approved = True
+            self.store.save_plan(plan)
+            plan_payload = {"plan_id": plan.id, "solver": plan.solver, "solver_ms": plan.solver_ms,
+                            "plan": plan.model_dump(mode="json")}
+            self.emit("plan.approved", "Schedule proposal approved", case.id,
+                      payload=plan_payload, success=True)
+            self.emit("plan.activated", "Approved schedule is now active", case.id,
+                      payload=plan_payload, success=True)
             case.status = CaseStatus.scheduled
             self.store.save_case(case, "Schedule approved")
             self.emit("case.status_changed", "Case schedule approved", case.id,
