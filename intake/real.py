@@ -6,7 +6,7 @@ import base64, json, mimetypes, re
 from pathlib import Path
 from uuid import uuid4
 from pydantic import ValidationError
-from backend.config import BASE_DIR, COMPONENT_TIMEOUT_SECONDS, INTAKE_MODEL
+from backend.config import COMPONENT_TIMEOUT_SECONDS, INTAKE_MODEL
 from backend.llm_client import LLMClient, LLMError
 from backend.schemas import Case, Evidence
 
@@ -25,26 +25,19 @@ Reply with ONE JSON object only, no prose, using exactly these keys:
  "summary": "one neutral sentence describing the hazard"}
 Use null for anything the report does not state. Never include names, phone numbers, emails or addresses in any field."""
 
-# shortcut: media must already be saved under uploads/ and referenced as "upload://<name>"; move to the backend's upload store once one exists.
-UPLOAD_DIR = BASE_DIR / "uploads"
-
-def _upload_path(uri: str | None) -> Path | None:
-    """Resolve upload://<name> inside UPLOAD_DIR only, so a report can't make us send arbitrary server files (e.g. .env) to the model."""
-    if not uri or not uri.startswith("upload://"):
-        return None
-    root = UPLOAD_DIR.resolve()
-    path = (root / uri.removeprefix("upload://")).resolve()
-    return path if path.is_relative_to(root) and path.is_file() else None
+def _local_file(path: str | None) -> Path | None:
+    # Media paths come only from backend.uploads.UploadStore.resolve, which validates location and file type.
+    return Path(path) if path and Path(path).is_file() else None
 
 def _b64(path: Path) -> str:
     return base64.b64encode(path.read_bytes()).decode()
 
 def _build_messages(text: str, photo_uri: str | None, audio_uri: str | None) -> list[dict]:
     content: list[dict] = [{"type": "text", "text": f"Resident report:\n{text}"}]
-    photo = _upload_path(photo_uri)
+    photo = _local_file(photo_uri)
     if photo and (mime := mimetypes.guess_type(photo.name)[0] or "").startswith("image/"):
         content.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{_b64(photo)}"}})
-    if audio := _upload_path(audio_uri):
+    if audio := _local_file(audio_uri):
         # VERIFY: Nano Omni's accepted audio part/formats; this is the OpenAI input_audio shape (wav, mp3).
         content.append({"type": "input_audio", "input_audio": {"data": _b64(audio), "format": audio.suffix.lstrip(".").lower()}})
     return [{"role": "system", "content": PROMPT}, {"role": "user", "content": content}]

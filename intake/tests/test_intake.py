@@ -46,19 +46,13 @@ def test_model_request_failure_is_explicit_error(monkeypatch):
     with pytest.raises(real.IntakeError, match="request failed: connection refused"):
         agent.analyse_report("Water leaking under the sink")
 
-def test_photo_and_audio_are_sent_to_model(monkeypatch, tmp_path):
-    monkeypatch.setattr(real, "UPLOAD_DIR", tmp_path)
-    (tmp_path / "p.jpg").write_bytes(b"jpg"); (tmp_path / "a.mp3").write_bytes(b"mp3")
-    parts = real._build_messages("mould", "upload://p.jpg", "upload://a.mp3")[1]["content"]
+def test_photo_and_audio_are_sent_to_model(tmp_path):
+    photo, audio = tmp_path / "p.jpg", tmp_path / "a.mp3"
+    photo.write_bytes(b"jpg"); audio.write_bytes(b"mp3")
+    parts = real._build_messages("mould", str(photo), str(audio))[1]["content"]
     assert parts[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
     assert parts[2]["input_audio"]["format"] == "mp3"
-
-def test_media_outside_uploads_is_never_sent(monkeypatch, tmp_path):
-    uploads = tmp_path / "uploads"; uploads.mkdir()
-    secret = tmp_path / ".env"; secret.write_text("LLM_API_KEY=secret")
-    monkeypatch.setattr(real, "UPLOAD_DIR", uploads)
-    for uri in ("upload://../.env", f"upload://{secret}", str(secret), "https://example.com/x.jpg"):
-        assert len(real._build_messages("mould", uri, uri)[1]["content"]) == 1
+    assert len(real._build_messages("mould", "upload://missing.jpg", None)[1]["content"]) == 1
 
 def test_long_report_and_inline_thinking(monkeypatch):
     monkeypatch.setattr(agent, "INTAKE_ADAPTER", "mock")

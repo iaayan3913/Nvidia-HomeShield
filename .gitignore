@@ -12,4 +12,4 @@ frontend/public/buildings.geojson
 data/generated/
 data/raw/
 data/processed/
-uploads/
+data/uploads/
