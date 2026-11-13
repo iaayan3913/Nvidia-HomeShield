@@ -16,6 +16,7 @@ from backend.schemas import (
 )
 from intake.agent import analyse_report
 from scheduler import diff_plans, get_scheduler, validate_plan
+from scheduler.core import naive_utc, utcnow
 from scheduler.fixtures import case_to_job
 from scheduler.service import SchedulingService
 from store.sqlite import Store
@@ -195,8 +196,7 @@ class HomeShieldService:
                     payload["plan_id"] = plan.id
                     action = "commit_plan"
                 else:
-                    action = "retry_schedule"
-                    payload["reason"] = "No valid schedule proposal is available"
+                    raise ValueError("cannot request plan approval before scheduling succeeds")
             approval = self.request_approval(case_id, action, payload)
             with self._agent_lock:
                 self._agent_approvals[case_id] = approval
@@ -228,7 +228,12 @@ class HomeShieldService:
                 case.evidence.append(Evidence(kind=media.kind, uri=media.reference, description=description))
 
     def _jobs_for_proposal(self) -> list:
-        self.scheduling.refresh_for_clock()
+        scheduler_now = self.scheduling.refresh_for_clock()
+        # Persisted case/deadline timestamps remain real UTC. Only translate
+        # the job's scheduling origin into the demo clock domain. With the
+        # normal speed=1 clock this offset stays stable across long-running
+        # processes, avoiding stale ETAs while keeping legal dates untouched.
+        clock_offset = scheduler_now - utcnow()
         jobs = dict(self.scheduling.jobs)
         for case in self.store.list_cases():
             if case.status == CaseStatus.resolved:
@@ -237,10 +242,8 @@ class HomeShieldService:
             self.scheduling.resolve_property(case)
             if case.property_id != previous_property:
                 self.store.save_case(case, "Scheduler assigned a synthetic demo property")
-            # A case's scheduling window begins when the landlord became aware of
-            # it. Rebuilding old jobs with the current clock invalidated active
-            # ETAs and was the long-running-process 503 root cause.
-            job = case_to_job(case, now=case.created_at)
+            case_created = naive_utc(case.created_at)
+            job = case_to_job(case, now=case_created + clock_offset)
             jobs[job.id] = job
         return list(jobs.values())
 

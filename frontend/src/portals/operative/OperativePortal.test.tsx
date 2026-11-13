@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mockService } from '../../shared/mock';
@@ -37,7 +37,7 @@ describe('operative portal', () => {
     expect(screen.getByText('No active assignments')).toBeTruthy();
   });
 
-  it('progresses a job and requires completion notes', () => {
+  it('progresses a job and requires completion notes', async () => {
     renderPortal();
     fireEvent.click(screen.getByRole('button', { name: 'Start travelling' }));
     expect(mockService.getState().jobs.find((j) => j.id === 'j-041')!.status).toBe('travelling');
@@ -53,7 +53,7 @@ describe('operative portal', () => {
     expect(job.status).toBe('completed');
     expect(job.completion_notes).toBe('Replaced trap seal');
     expect(screen.getByText('All assigned jobs finished')).toBeTruthy();
-    expect(document.activeElement).toBe(nextHeading());
+    await waitFor(() => expect(document.activeElement).toBe(nextHeading()));
   });
 
   it('records an unable-to-complete reason', () => {

@@ -67,6 +67,9 @@ a { color: inherit; }
 .portal-link.is-active { color: var(--ink-900); background: var(--green-050); box-shadow: inset 0 -2px var(--green-500); }
 .demo-indicator { justify-self: end; display: inline-flex; align-items: center; gap: .45rem; color: var(--ink-500); font-size: .82rem; font-weight: 600; }
 .demo-indicator > span { width: 7px; height: 7px; border-radius: 50%; background: var(--warning); }
+.demo-indicator > span[data-status="connected"] { background: var(--success); }
+.demo-indicator > span[data-status="disconnected"] { background: var(--danger); }
+.demo-indicator button { border: 0; padding: .2rem .35rem; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; }
 
 [data-portal="operations"] { color-scheme: dark; --surface: var(--graphite-800); --surface-subtle: var(--graphite-950); --surface-muted: var(--graphite-700); --border: #303830; --border-strong: #465047; --ink-900: #f3f6f1; --ink-700: #cad1c7; --ink-500: #9ca79d; }
 [data-portal="operations"] .topbar { background: rgb(17 20 17 / .97); }

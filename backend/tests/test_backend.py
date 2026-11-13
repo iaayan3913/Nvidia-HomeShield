@@ -6,6 +6,7 @@ import pytest
 from agent.orchestrator import PythonToolAgent
 from agent.rules import add_working_days, compute_deadlines
 from backend.app import create_app
+from backend.llm_client import LLMError
 from backend.schemas import Case, HazardType, ReportIn, Severity
 from backend.service import HomeShieldService
 from scheduler.mock import MockScheduler
@@ -154,6 +155,33 @@ def test_python_agent_limits_and_records_failures():
     failure_result = failed.run("case-1")
     assert failure_result[0]["success"] is False
     assert "sensitive" not in failure_result[0]["summary"]
+
+
+def test_python_agent_llm_failure_falls_back_and_streams_auditable_events(tmp_path):
+    class UnavailableLightning:
+        def complete(self, messages, **kwargs):
+            raise LLMError("model timeout")
+
+    service = make_service(tmp_path)
+    service.agent_runtime = "python"
+    service.agent = PythonToolAgent(service.execute_agent_tool, client=UnavailableLightning(),
+                                    use_model=True)
+    client = TestClient(create_app(service))
+    response = client.post("/api/reports", json={"text": "Mould in bedroom", "property_id": "p-001"})
+    assert response.status_code == 201
+    body = response.json()
+    assert body["plan"] is not None
+    assert body["approval"]["action"] == "commit_plan"
+    assert body["plan"]["approved"] is False
+
+    events = client.get("/api/events").json()
+    actions = [event for event in events if event["type"] == "agent.action_result"]
+    assert [event["tool_name"] for event in actions] == [
+        "agent_reasoning", "compute_deadlines", "schedule_job", "request_approval"
+    ]
+    assert "deterministic fallback used" in actions[0]["summary"]
+    stream = client.get("/api/stream?once=true").text
+    assert "event: plan.proposed" in stream and "deterministic fallback used" in stream
 
 
 def test_agent_tool_validation_and_failure_audit(tmp_path):

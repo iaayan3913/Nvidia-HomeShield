@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { Ban, Camera, CheckCircle2, CircleDot, Clock, Footprints, KeyRound, MapPin, Navigation, Siren, TriangleAlert, Wrench, X } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
 import { Select, Textarea } from '../../shared/components/FormControls';
-import { mockService } from '../../shared/mock';
+import { homeShieldService, isApiMode } from '../../shared/data';
 import { useNotifications } from '../../shared/notifications/NotificationProvider';
 import type { JobStatus } from '../../shared/types/domain';
 import { NEXT_STEP, STATUS_LABEL, formatTime, humanise, isFinished, priorityOf, timeWindow, type WorkItem } from './model';
@@ -33,11 +33,11 @@ export function JobCard({ item, route, headingLevel = 3 }: { item: WorkItem; rou
   const finished = isFinished(job.status);
   const Heading = `h${headingLevel}` as const;
 
-  function advance(status: JobStatus) {
+  async function advance(status: JobStatus) {
     setError(null);
     try {
-      mockService.updateJobProgress(job.id, status);
-      notify({ kind: 'success', title: STATUS_LABEL[status], message: `${reference} updated. Operations can see this now.` });
+      await homeShieldService.updateJobProgress(job.id, status);
+      notify({ kind: 'success', title: STATUS_LABEL[status], message: isApiMode ? `${reference} updated locally only; FastAPI does not yet persist operative progress.` : `${reference} updated. Operations can see this now.` });
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'The job could not be updated. Try again.'); }
   }
 
@@ -59,7 +59,7 @@ export function JobCard({ item, route, headingLevel = 3 }: { item: WorkItem; rou
       : finishing ? <FinishForm item={item} mode={finishing} onCancel={() => { setFinishing(null); requestAnimationFrame(() => actionsRef.current?.querySelector('button')?.focus()); }} onDone={() => setFinishing(null)} />
       : <div className="op-actions" ref={actionsRef}>
         {step && <Button icon={step.status === 'completed' ? <CheckCircle2 size={20} aria-hidden="true" /> : step.status === 'on_site' ? <Footprints size={20} aria-hidden="true" /> : <Navigation size={20} aria-hidden="true" />}
-          onClick={() => step.status === 'completed' ? setFinishing('completed') : advance(step.status)}>{step.label}</Button>}
+          onClick={() => step.status === 'completed' ? setFinishing('completed') : void advance(step.status)}>{step.label}</Button>}
         <Button variant="secondary" icon={<Ban size={18} aria-hidden="true" />} onClick={() => setFinishing('unable_to_complete')}>Unable to complete</Button>
       </div>}
     {error && <p className="op-error" role="alert">{error}</p>}
@@ -77,14 +77,14 @@ function FinishForm({ item, mode, onCancel, onDone }: { item: WorkItem; mode: 'c
   // Binary media stays in component memory only; object URLs are revoked and never persisted.
   useEffect(() => { const urls = photos.map((file) => URL.createObjectURL(file)); setPreviews(urls); return () => urls.forEach((url) => URL.revokeObjectURL(url)); }, [photos]);
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (notes.trim().length < 5) { setError(completing ? 'Add a short note on the work done (at least 5 characters).' : 'Explain briefly why the job could not be completed.'); return; }
     const evidence = photos.length ? ` [${photos.length} photo${photos.length === 1 ? '' : 's'} selected on device; not uploaded in demonstration]` : '';
     const text = `${completing ? '' : `${reason}: `}${notes.trim()}${evidence}`;
     try {
-      mockService.updateJobProgress(item.job.id, mode, text);
-      notify({ kind: completing ? 'success' : 'warning', title: completing ? 'Job completed' : 'Marked unable to complete', message: `${reference} updated. Operations can see your notes.` });
+      await homeShieldService.updateJobProgress(item.job.id, mode, text);
+      notify({ kind: completing ? 'success' : 'warning', title: completing ? 'Job completed' : 'Marked unable to complete', message: isApiMode ? `${reference} changed locally only; FastAPI has no operative progress endpoint.` : `${reference} updated. Operations can see your notes.` });
       onDone();
       document.getElementById('op-next-heading')?.focus();
     } catch (cause) { setSubmitError(cause instanceof Error ? cause.message : 'The job could not be updated. Your notes are still here; try again.'); }

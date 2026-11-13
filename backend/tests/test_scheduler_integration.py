@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from backend.app import create_app
 from backend.schemas import Case, HazardType, Severity
 from backend.service import HomeShieldService
+import backend.service as service_module
 from scheduler import get_scheduler
 from scheduler import cuopt as cuopt_module
 from scheduler import ortools as ortools_module
@@ -99,6 +100,62 @@ def test_emergency_replan_remains_proposed_until_decision(tmp_path):
     assert completed["payload"]["plan"]["workers"] and "changes" in completed["payload"]
 
 
+def test_real_case_times_are_translated_to_demo_clock_without_changing_legal_dates(tmp_path, monkeypatch):
+    real_now = [datetime(2026, 11, 13, 15, 30, tzinfo=timezone.utc)]
+    demo_now = [datetime(2026, 11, 13, 11, 0)]
+
+    def clocked_intake(text, photo_uri=None, audio_uri=None, property_id=None):
+        gas = "gas" in text.lower()
+        return Case(id=f"case-{uuid4().hex[:8]}",
+                    hazard_type=HazardType.gas if gas else HazardType.damp_mould,
+                    severity=Severity.emergency if gas else Severity.moderate,
+                    is_emergency=gas, summary=text, property_id=property_id or "p-001",
+                    created_at=real_now[0])
+
+    service = HomeShieldService(Store(str(tmp_path / "clock-domain.sqlite3")), MockScheduler(),
+                                intake=clocked_intake, intake_adapter="mock",
+                                scheduler_adapter="mock", scheduler_seed_jobs=False)
+    service.scheduling.clock.now = lambda: demo_now[0]
+    monkeypatch.setattr(service_module, "utcnow", lambda: real_now[0].replace(tzinfo=None))
+    client = TestClient(create_app(service))
+
+    first = client.post("/api/emergency", json={"text": "gas smell at 15:30", "property_id": "p-110"})
+    assert first.status_code == 201
+    first_body = first.json()
+    first_job = f"job-{first_body['case']['id']}"
+    assert first_body["plan"] is not None and first_job not in first_body["plan"]["unassigned_jobs"]
+    assigned = [(route["worker_id"], stop) for route in first_body["plan"]["workers"]
+                for stop in route["stops"] if stop["job_id"] == first_job]
+    assert assigned and assigned[0][0] in {
+        worker.id for worker in service.scheduling.workers
+        if HazardType.gas.value in {getattr(skill, "value", skill) for skill in worker.skills}
+    }
+    stored = service.store.get_case(first_body["case"]["id"])
+    assert stored.created_at == real_now[0]
+    assert stored.deadlines.investigate_by == real_now[0] + timedelta(hours=24)
+
+    approved = client.post(f"/api/approvals/{first_body['approval']['id']}/approve",
+                           json={"decided_by": "clock-test"})
+    assert approved.status_code == 200
+
+    # Wall time is now beyond gas workers' 16:00 fixture shift, while the demo
+    # clock remains within it. The second emergency must still be feasible.
+    real_now[0] = datetime(2026, 11, 13, 18, 15, tzinfo=timezone.utc)
+    demo_now[0] = datetime(2026, 11, 13, 13, 45)
+    second = client.post("/api/emergency", json={"text": "second gas emergency", "property_id": "p-111"})
+    assert second.status_code == 201
+    second_body = second.json()
+    second_job = f"job-{second_body['case']['id']}"
+    assert second_body["plan"] is not None and second_job not in second_body["plan"]["unassigned_jobs"]
+
+    ordinary = client.post("/api/reports", json={"text": "ordinary mould report", "property_id": "p-002"})
+    assert ordinary.status_code == 201 and ordinary.json()["plan"] is not None
+    ordinary_approval = ordinary.json()["approval"]["id"]
+    assert client.post(f"/api/approvals/{ordinary_approval}/approve",
+                       json={"decided_by": "clock-test"}).status_code == 200
+    assert client.get("/api/plans/active").json()["approved"] is True
+
+
 def test_unassigned_jobs_and_scheduler_failures_are_explicit(tmp_path):
     service = integration_service(tmp_path)
     service.scheduling.workers = []
@@ -134,7 +191,7 @@ def test_unassigned_jobs_and_scheduler_failures_are_explicit(tmp_path):
 
 
 @pytest.mark.parametrize("adapter", ["mock", "ortools"])
-def test_repeated_reports_approvals_and_next_day_emergency_without_restart(tmp_path, adapter):
+def test_repeated_reports_approvals_and_next_day_emergency_without_restart(tmp_path, adapter, monkeypatch):
     if adapter == "ortools" and not ortools_module.available():
         pytest.skip("OR-Tools is not installed")
     current = [datetime(2026, 11, 13, 10, tzinfo=timezone.utc)]
@@ -149,6 +206,7 @@ def test_repeated_reports_approvals_and_next_day_emergency_without_restart(tmp_p
                                 intake_adapter="mock", scheduler_adapter=adapter,
                                 scheduler_seed_jobs=False)
     service.scheduling.clock.now = lambda: current[0].replace(tzinfo=None)
+    monkeypatch.setattr(service_module, "utcnow", lambda: current[0].replace(tzinfo=None))
     client = TestClient(create_app(service))
     for hour in (10, 13, 16):
         current[0] = datetime(2026, 11, 13, hour, tzinfo=timezone.utc)
