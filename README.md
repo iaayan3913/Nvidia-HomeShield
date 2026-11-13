@@ -1,5 +1,13 @@
 # HomeShield
 
+## Why this matters
+
+In December 2020, two-year-old **Awaab Ishak** died in Rochdale after prolonged exposure to black mould in his family's social housing flat. His family had repeatedly reported the damp and mould to their landlord, but it was never properly dealt with. In 2022 a coroner ruled that the mould caused the respiratory condition that killed him.
+
+His death led to **Awaab's Law**, which requires social landlords in England to investigate and fix dangerous damp, mould and other emergency hazards within fixed time limits. Meeting those limits depends on spotting the dangerous reports quickly and getting the right person to the home fast. Today that often means busy staff working through phone calls, emails and spreadsheets.
+
+## What HomeShield does
+
 HomeShield turns a tenant's repair report into an approved, scheduled repair visit. A resident reports a problem from their phone. AI running on an **NVIDIA DGX Spark** reads the photo and message and suggests the hazard and urgency. A housing officer reviews the case on a live 3D map of Sheffield. **NVIDIA cuOpt** then plans which operative goes where. Nothing reaches an operative until a person approves it, and the AI and tenant data stay on the Spark.
 
 Built for the NVIDIA Hack for Impact, 13 November 2026.
@@ -194,6 +202,16 @@ npm run typecheck; npm test; npm run build
 - **No staff login yet.** Anyone on the network who knows the address can open the staff apps. Keep ports 5174 and 8001 off the internet and untrusted networks.
 - **Sample data.** The property register and operatives are fixtures, and case locations are approximate until a real property register is connected. Real tenant data is personal data under UK GDPR; see [data/README.md](data/README.md).
 - **Approval replaces the whole plan.** Approving a proposal currently replaces the active plan rather than merging with it. The review screen lists any approved visits that would drop out.
+
+## Contributors
+
+| Name | Role | Responsibilities |
+|---|---|---|
+| **Ahmed** | Person 1 | DGX Spark, models and NemoClaw: Spark setup, serving Nemotron 3 Nano Omni and Nemotron 3.5 Lightning, agent runtime |
+| **Iyaaz** | Person 2 | Multimodal intake: reading photos, voice notes and text into a structured case |
+| **Fowzan** | Person 3 | Backend, compliance and orchestration: FastAPI service, deadline rules, approvals and the live event stream |
+| **Aayan** | Person 4 | cuOpt, scheduling and map data: route optimisation, emergency re-planning and Sheffield map data |
+| **Enan** | Person 5 | Frontend, digital twin and demo: the resident, Operations and Operative apps, and the demo |
 
 ## Attribution
 
