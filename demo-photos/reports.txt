@@ -1,8 +1,17 @@
-mould.jpg (expected: damp_mould, significant, not emergency)
-Black mould spots are spreading across my bedroom wall and my 4-year-old sleeps in there. It keeps coming back every time I wipe it off.
+mould.jpg
+There's black mould spreading across my son's bedroom wall by the window.
+He's 3 and has been coughing at night for about two weeks.
+Emergency: NO. It's a significant damp and mould hazard, 
+but treat it as high priority because a young child is at home.
 
-leak.jpg (expected: leak, moderate, not emergency)
-The kitchen ceiling is peeling and has brown stains since the flat upstairs had a leak. The plaster still feels damp when I touch it.
+leak.jpg
+Water is coming through our kitchen ceiling from the flat above and the brown stain is 
+getting bigger. It started this morning and is dripping onto the floor.
+Emergency: NO. It's a significant hazard with an urgent repair. It would become an emergency
+if the water reached a light fitting or electrics.
 
-socket.jpg (expected: electrical, emergency)
-The socket in my living room burnt out and the cover fell off. There are scorch marks and bare wires showing, and my children are in the house.
+socket.jpg
+The plug socket in my living room started crackling and smoking. Now it's black and burnt,
+and the cover has partly melted so I can see the wires. I've turned the power off at the 
+fuse box but I'm scared it'll catch fire.
+Emergency: YES. It's a fire and electric shock risk, so it must be made safe within 24 hours.
