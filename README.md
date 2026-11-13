@@ -1,39 +1,85 @@
 # HomeShield
 
-HomeShield is a mock-first, local-AI workflow for turning resident hazard reports into compliant cases and worker schedules. The repository is designed for five people to build in parallel on Friday 13 November 2026, with a FastAPI backend, a React dashboard, and a shared contract.
+HomeShield turns a tenant's repair report into an approved, scheduled repair visit. A resident reports a problem from their phone. AI running on an **NVIDIA DGX Spark** reads the photo and message and suggests the hazard and urgency. A housing officer reviews the case on a live 3D map of Sheffield. **NVIDIA cuOpt** then plans which operative goes where. Nothing reaches an operative until a person approves it, and the AI and tenant data stay on the Spark.
 
-## First 15 minutes
+Built for the NVIDIA Hack for Impact, 13 November 2026.
 
-1. Everyone: clone/pull, copy `.env.example` to `.env`, and read [docs/CONTRACTS.md](docs/CONTRACTS.md).
-2. Person 1: run `scripts/spark/smoke_test.sh` and `ollama_inventory.sh` on the Spark.
-3. Person 2: run the intake mock test and check `intake/agent.py` returns a `Case`.
-4. Person 3: start the API with `py -m uvicorn backend.app:app --reload --port 8001` and open `/docs`.
-5. Person 4: run `py -m scheduler.mock` and inspect the sample plan.
-6. Person 5: run `npm install` and `npm run dev` in `frontend/`.
-
-## Windows quickstart
-
-```powershell
-py -m venv .venv
-.venv\Scripts\activate
-py -m pip install -r requirements.txt
-Copy-Item .env.example .env
-py -m uvicorn backend.app:app --reload --port 8001
+```text
+ Resident (phone)          DGX Spark                                   Staff (laptop)
+ ───────────────           ─────────                                   ──────────────
+ Report a problem  ──▶  Nemotron 3 Nano Omni reads photo/voice/text
+                        Deadline rules suggest when it must be done
+                        Nemotron 3.5 Lightning coordinates the tools
+                        cuOpt proposes operative routes            ──▶  Operations: review, approve
+ Track the report  ◀──  live updates over SSE                      ◀──  Operative: travel, on site, done
 ```
 
-In another PowerShell window:
+## NVIDIA technology
+
+| Technology | What it does in HomeShield |
+|---|---|
+| **DGX Spark** (GB10 Grace Blackwell) | Runs the models, the route optimiser and the backend on one desk-side machine, so tenants' photos and addresses never leave the building. |
+| **Nemotron 3 Nano Omni** (vLLM on the Spark) | Reads a tenant's photo, voice note and message together and suggests the hazard, room and urgency. All three demo reports are classified correctly in about 4–6 seconds. |
+| **Nemotron 3.5 Lightning 30B** (Ollama on the Spark) | Agent that chooses backend tools in a safe order (deadlines, then scheduling, then a request for human approval), with an audit trail. Enabled with `AGENT_RUNTIME=python`. |
+| **cuOpt 26.10** (on the Spark GPU) | Optimises and re-plans operatives' routes. It re-plans 8 operatives and 37 jobs for a gas emergency in about 1.1 s, moving only one existing visit. |
+
+OR-Tools and a deterministic mock remain as automatic fallbacks. `/health` always reports which scheduler and models are actually in use, and the apps show a **Test mode** badge whenever services are simulated.
+
+## The three screens
+
+| App | Route | Who | What it does |
+|---|---|---|---|
+| **Resident app** | `/report` | Tenants, on any device | A five-step report form (problem, home, photo/voice, contact, review), a reference number, and live tracking of the repair stages. |
+| **Operations** | `/operations` | Housing officers, on a laptop or PC | A 3D digital twin of Sheffield showing cases by severity and hazard. It includes AI triage details, an agent activity log, and a review step for every schedule: the officer compares the proposal with the active plan, then approves it or rejects it with a reason. |
+| **Operative** | `/operative` | Repair operatives | Today's visits in route order, with start travelling, arrived on site, and complete or unable to complete. |
+
+The resident and staff apps are separate builds. The resident bundle contains no map or staff code. Both apps support light, dark and system themes.
+
+## Quick start: one laptop, no Spark
+
+Everything runs offline with mock AI. Use Python 3.13 and Node 20+.
+
+```powershell
+py -3.13 -m venv .venv
+.venv\Scripts\activate
+py -m pip install -r requirements.txt
+Copy-Item .env.example .env          # USE_MOCKS=true by default
+py -m uvicorn backend.app:app --port 8001
+```
+
+In a second window:
 
 ```powershell
 cd frontend
 npm install
-npm run dev
+npm run dev                          # all routes on http://localhost:5173
 ```
 
-Set `USE_MOCKS=true` for a completely offline demo. Never commit `.env` or API keys.
+Open `http://localhost:5173/report` to file a report, then `http://localhost:5173/operations` to see it arrive.
 
-## Run HomeShield on two devices
+## Run with the DGX Spark
 
-HomeShield is two web apps backed by one FastAPI service. Residents use the **resident app** on a phone, tablet or laptop. Officers and operatives use the **staff app** (`/operations`, `/operative`) on a laptop or PC.
+The Spark serves Nano Omni on port 8000 and Ollama on port 11434. NVIDIA Sync forwards only the DGX Dashboard and Jupyter, so open an SSH tunnel for the models. Use the SSH alias NVIDIA Sync creates (named after the device, for example `BrightEyes`):
+
+```powershell
+# Keep this window open while you work.
+ssh -F "$env:LOCALAPPDATA\NVIDIA Corporation\Sync\config\ssh_config" -N `
+    -L 18000:127.0.0.1:8000 -L 11434:127.0.0.1:11434 <device-alias>
+```
+
+Then use the Spark profile and check both models answer:
+
+```powershell
+Copy-Item .env.ollama .env
+.venv\Scripts\python.exe scripts\spark\check_endpoints.py   # both lines should say 200
+py -m uvicorn backend.app:app --port 8001
+```
+
+`/health` should now report `"mocks": false`, and the **Test mode** badge disappears. To use the Lightning agent, set `AGENT_RUNTIME=python` in `.env`. To use cuOpt, run the backend on the Spark itself in its cuOpt environment (see [scripts/spark/RECOVERY.md](scripts/spark/RECOVERY.md)). The demo deployment runs there on port 8100 with `SCHEDULER_ADAPTER=cuopt`.
+
+Before recording or presenting, re-check the models with `py -3.13 -m intake.try_live`.
+
+## Run on two devices (phone and laptop)
 
 ```text
         Phone (same Wi-Fi)                           Laptop
@@ -49,78 +95,106 @@ HomeShield is two web apps backed by one FastAPI service. Residents use the **re
                                    └─────────────────────────────────────────────┘
 ```
 
-The browser only ever calls relative `/api/...` URLs on the page's own origin, and each Vite dev server forwards them to the backend. That means no CORS, no mixed content and no hard-coded IP addresses.
-
-### Commands (three PowerShell windows on the laptop)
+The browser only ever calls relative `/api/...` URLs on its own origin, and each Vite dev server forwards them to the backend. That means no CORS, no mixed content and no hard-coded IP addresses.
 
 ```powershell
-# 1. Backend, reachable by both dev servers. Add $env:ALLOW_DEV_RESET="true" to enable the reset button.
+# 1. Backend. Add $env:ALLOW_DEV_RESET="true" to enable the reset button.
 py -3.13 -m uvicorn backend.app:app --host 0.0.0.0 --port 8001
 
 # 2. Staff app (this laptop only)
-cd frontend
-npm run dev:staff                 # http://localhost:5174/operations and /operative
+cd frontend; npm run dev:staff              # http://localhost:5174/operations and /operative
 
-# 3. Resident app (exposed on the LAN for phones)
-cd frontend
-npm run dev:resident:https        # https://<LAN-IP>:5173/report  (needed for voice notes)
-# or: npm run dev:resident        # http://<LAN-IP>:5173/report   (photos and text only)
+# 3. Resident app (exposed on the LAN)
+cd frontend; npm run dev:resident:https     # https://<LAN-IP>:5173/report (needed for voice notes)
+#        or: npm run dev:resident           # http only: photos and text, no microphone
 ```
 
-Run `npm install` in `frontend/` first. `npm run dev` still starts a combined app with every route on port 5173 for local development. `npm run build` builds both apps into `frontend/dist/resident` and `frontend/dist/staff`. The resident bundle contains no map or staff code.
+- **LAN address:** run `ipconfig` and use the Wi-Fi adapter's **IPv4 Address**, for example `https://192.168.1.23:5173/report`.
+- **Firewall:** the first time the resident server starts, Windows asks whether Node.js may accept connections. Allow it on **Private networks** only.
+- **Certificate warning:** the HTTPS mode uses a self-signed certificate. On the phone, choose *Advanced → Proceed*. Phones only allow microphone recording over HTTPS.
 
-### Find the laptop's LAN address
+`npm run build` builds both apps into `frontend/dist/resident` and `frontend/dist/staff`.
 
-Run `ipconfig` and use the **IPv4 Address** of the Wi-Fi adapter (for example `192.168.1.23`). The phone opens `https://192.168.1.23:5173/report`.
+## Demo walkthrough
 
-### First-run prompts
+1. **Report:** on the phone, report black mould in a child's bedroom and attach `demo-photos/mould.jpg`. Nano Omni classifies it as damp and mould and an **emergency**, and the tenant gets a reference.
+2. **Arrive:** within about a second, Operations shows a "New report" notice. Press **Locate** to fly to the case and open its details: triage, suggested deadlines, evidence and the agent's activity.
+3. **Approve:** open **Schedule**. The proposal's routes appear as dashed lines. Tick *I have reviewed* and press **Approve and activate**. The routes become solid and animate into place.
+4. **Do the work:** in **Operative**, the assigned operative starts travelling and arrives on site. Operations and the tenant's tracker both update without a reload.
+5. **Emergency:** send `demo-photos/socket.jpg` (a burnt socket) from the phone. It is classified as an electrical emergency, the scheduler re-plans around it, and the officer approves the change. In test mode, **Simulate emergency** creates a gas emergency instead.
 
-- **Windows Defender Firewall** asks whether Node.js may accept connections the first time the resident server starts. Allow it on **Private networks** only. If you dismissed the prompt, allow `node.exe` under *Windows Security → Firewall → Allow an app*.
-- **HTTPS certificate warning.** `dev:resident:https` uses a self-signed development certificate, so the phone shows "Your connection is not private". Choose *Advanced → Proceed* (Chrome) or *Show details → visit this website* (Safari). Phones only allow microphone recording on HTTPS. Plain HTTP still works for photos and text.
+The demo inputs and their expected classifications are in [demo-photos/reports.txt](demo-photos/reports.txt).
 
-### Environment variables
+## Configuration
 
-| Variable | Where | Default | Purpose |
-|---|---|---|---|
-| `VITE_DATA_MODE` | `frontend/.env.local` or the shell | `api` | `api` talks to FastAPI. `local` uses the in-browser service (tests and offline work). |
-| `VITE_BACKEND_URL` | `frontend/.env.local` or the shell | `http://127.0.0.1:8001` | Where the dev servers proxy `/api`. |
-| `ALLOW_DEV_RESET` | root `.env` | `false` | Enables `POST /api/dev/reset` (deletes every case, plan, approval and event) and the reset controls. Development only. |
-| `CORS_ORIGINS` | root `.env` | `http://localhost:5173,…` | Not needed in development (the proxy keeps requests same-origin). Set it to the deployed app origins only if production builds call the API from a different origin. |
-| `USE_MOCKS` | root `.env` | `true` | When true, `/health` reports `mocks: true` and the apps show a **Test mode** badge. |
+Copy `.env.example` to `.env`; ready-made profiles are `.env.mock` (offline), `.env.ollama` (DGX Spark) and `.env.hosted` (NVIDIA hosted API backup). Never commit `.env` or API keys.
 
-### Troubleshooting
+| Variable | Default | Purpose |
+|---|---|---|
+| `USE_MOCKS` | `true` | Use mock intake, agent and scheduler. `/health` reports it, and the apps show **Test mode**. |
+| `LLM_BASE_URL`, `INTAKE_MODEL` | Spark tunnel, `nemotron_3_nano_omni` | Nano Omni intake endpoint. |
+| `AGENT_RUNTIME` | `mock` | `python` uses the Lightning model, `nemoclaw` uses `NEMOCLAW_URL`, and `mock` is deterministic. |
+| `AGENT_BASE_URL`, `AGENT_MODEL` | Spark tunnel, `nemotron-3.5-lightning:30b` | Lightning agent endpoint (Ollama). |
+| `SCHEDULER_ADAPTER` | `mock` | `cuopt`, `ortools`, `auto` or `mock`; with `SCHEDULER_ALLOW_FALLBACK=true`, a failed solver falls back and says so. |
+| `SCHEDULER_SEED_JOBS` | `true` | Adds 36 fixture jobs across 8 operatives. Set it to `false` so new reports are an operative's first job. |
+| `ALLOW_DEV_RESET` | `false` | Enables `POST /api/dev/reset` and the reset buttons. Development only. |
+| `DATABASE_PATH` | `homeshield.sqlite3` | SQLite file for cases, plans, approvals and events. |
+| `VITE_DATA_MODE` | `api` | Frontend: `api` talks to FastAPI; `local` uses the in-browser mock (tests and offline work). |
+| `VITE_BACKEND_URL` | `http://127.0.0.1:8001` | Where the frontend dev servers proxy `/api`. |
 
-- **Staff header stays on "Connecting…" or "Offline · retrying".** Is the backend running? Open `http://localhost:5174/api/health`. If it returns 404, an older backend is still running on port 8001; stop it and restart.
-- **Port already in use.** `netstat -ano | findstr :5173` shows the process ID; close that window or end the process.
-- **Phone cannot load the page.** Check that both devices are on the same Wi-Fi network (guest networks often isolate devices), that the firewall rule exists, and that you used the IPv4 address and the right scheme (`https` with `dev:resident:https`).
-- **Blank page or stale code after pulling.** Run `npm install`, then restart with `npm run dev -- --force` (or `npm run dev:staff -- --force`) to rebuild Vite's dependency cache.
-- **Operations map is blank.** The map needs WebGL. Check `chrome://gpu` and confirm WebGL shows *Hardware accelerated*, or try another browser.
-- **Reports arrive late.** The stream polls SQLite once per second, so a report normally appears in under 2 seconds. Check the staff header shows **Live**.
+## Map data
 
-### Known risk: staff dashboards have no login
+Operations uses **OpenFreeMap** vector tiles (OpenMapTiles schema, data from OpenStreetMap) with buildings extruded to their real heights. Dark and light themes recolour the map without reloading tiles.
 
-There is no authentication yet. Anyone on the same network who knows the address and port can open the staff dashboards, so the staff server stays on `localhost` by default. Do not expose port 5174 or 8001 to the internet or to untrusted networks.
+For offline use, the twin falls back automatically to local files in `frontend/public/data/`: about 41,000 buildings, 9,000 road segments and 160 place names within 3.5 km of the city centre. To regenerate them:
 
-## Spark quickstart
-
-Only Person 1 deploys to the Spark. Use NVIDIA Sync or SSH, then run:
-
-```bash
-bash scripts/spark/smoke_test.sh
-bash scripts/spark/ollama_inventory.sh
+```powershell
+py -3.13 scripts/fetch-sheffield.py                       # from the Overpass API
+py -3.13 scripts/fetch-sheffield.py --source openfreemap  # if Overpass is unreachable
 ```
 
-See the five role runbooks in [docs/roles](docs/roles) and the shared gates in [CHECKLIST.md](CHECKLIST.md).
+If WebGL is unavailable, Operations switches to a 2D map that you can still pan and zoom.
+
+## Tests
+
+```powershell
+.venv\Scripts\python.exe -m pytest -q backend/tests     # backend, intake, agent, scheduler
+cd frontend
+npm run typecheck; npm test; npm run build
+```
+
+## Troubleshooting
+
+- **The header shows "Connecting…" or "Offline".** Is the backend running? Open `http://localhost:5174/api/health`.
+- **Reports take about a minute, or the resident app says the service took too long.** The Lightning agent is spending its tokens on reasoning. Make sure the backend includes the `reasoning_effort` fix (on `fix/merged-integration` until it's merged) and that `AGENT_ENABLE_THINKING=false`.
+- **Activity shows "Agent reasoning model unavailable … deterministic fallback used".** The agent model is unreachable or returned an invalid plan. Check the SSH tunnel and `AGENT_MODEL`. The case is still handled safely by the deterministic rules.
+- **The Operations map is blank or shows the 2D view.** Check `chrome://gpu` for hardware-accelerated WebGL. After an `npm install` while a dev server was running, restart it with `npm run dev -- --force`.
+- **Port already in use.** `netstat -ano | findstr :5173` shows the process ID.
+- **The phone can't load the page.** Both devices must be on the same, non-guest Wi-Fi network. Check the firewall rule and use `https` with `dev:resident:https`.
 
 ## Repository map
 
-- `backend/`: FastAPI routes and Pydantic contracts
-- `intake/`, `agent/`, `scheduler/`, `store/`: replaceable application components
-- `frontend/`: offline-first React dashboard starter
-- `frontend/mock-build/`: prebuilt HomeShield dashboard running on mock data only (not yet wired to the backend); serve with `npm run mock` in `frontend/` → http://localhost:4173
-- `data/`: deterministic synthetic fixtures and map export helpers
-- `scripts/spark/`: Spark checks and endpoint helpers
+| Path | Contents |
+|---|---|
+| `backend/` | FastAPI app, Pydantic schemas, service layer, SSE stream, uploads and tests |
+| `intake/` | Report analysis: Nano Omni adapter (`real.py`), mock and triage rules |
+| `agent/` | Agent orchestrator, permitted tools and deadline rules |
+| `scheduler/` | cuOpt, OR-Tools and mock solvers, travel times and benchmark |
+| `store/` | SQLite persistence |
+| `frontend/` | React + TypeScript: `src/app/` (resident and staff shells), `src/portals/` (resident, operations, operative), `src/shared/` (data service, theme, components) |
+| `data/` | Fixtures, the property register and map export helpers ([data/README.md](data/README.md) covers handling real data) |
+| `scripts/` | `fetch-sheffield.py` map data and `spark/` checks, recovery and NemoClaw policy |
+| `demo-photos/` | Demo photos, voice notes and expected results |
+| `docs/` | [Contracts](docs/CONTRACTS.md), [backend integration](docs/BACKEND_INTEGRATION.md), [pitch](docs/PITCH.md), [role runbooks](docs/roles) |
 
-## Important verification items
+## Responsible use and known limits
 
-Items marked `VERIFY:` are deliberately not asserted as facts: confirm the official Awaab's Law guidance, exact Ollama model tags, NemoClaw policy commands, cuOpt aarch64 support, and any hosted model identifiers before relying on them.
+- **The AI only suggests.** Severity and deadlines are suggestions; a housing officer confirms them, and every schedule needs human approval before it reaches an operative. Classifications are not official HHSRS determinations.
+- **Awaab's Law.** Deadline rules are configurable and must be checked against the official government guidance before they're presented as legal requirements.
+- **No staff login yet.** Anyone on the network who knows the address can open the staff apps. Keep ports 5174 and 8001 off the internet and untrusted networks.
+- **Sample data.** The property register and operatives are fixtures, and case locations are approximate until a real property register is connected. Real tenant data is personal data under UK GDPR; see [data/README.md](data/README.md).
+- **Approval replaces the whole plan.** Approving a proposal currently replaces the active plan rather than merging with it. The review screen lists any approved visits that would drop out.
+
+## Attribution
+
+Map tiles: [OpenFreeMap](https://openfreemap.org) © [OpenMapTiles](https://www.openmaptiles.org/), data from [OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL). Local map files © OpenStreetMap contributors, ODbL 1.0. Demo photo credits are in [demo-photos/CREDITS.txt](demo-photos/CREDITS.txt).
