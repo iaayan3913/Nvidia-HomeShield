@@ -3,7 +3,6 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { mockService, type Case, type Report } from '../../shared/mock';
-import { homeShieldService } from '../../shared/data';
 import { NotificationProvider } from '../../shared/notifications/NotificationProvider';
 import { ResidentPortal } from './ResidentPortal';
 import { clearSession } from './session';
@@ -40,9 +39,9 @@ async function fillToReview({ manualAddress = false, withPhoto = false } = {}) {
 }
 
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason: unknown) => void; const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; }); return { promise, resolve, reject }; }
-const fakeResult = (id = 'HS-77777'): { report: Report; case: Case; plan: null; approval: null; warnings: string[] } => {
+const fakeResult = (id = 'HS-77777'): { report: Report; case: Case } => {
   const real = mockService.getState().cases[0]!;
-  return { report: { id: 'report-x', text: '', category: 'damp_mould', property_id: '', contact: { name: '', contact_number: '', preferred_contact: 'text' }, evidence: [], submitted_at: real.created_at, simulated: true }, case: { ...real, id, hazard_type: 'damp_mould', severity: 'moderate', is_emergency: false }, plan: null, approval: null, warnings: [] };
+  return { report: { id: 'report-x', text: '', category: 'damp_mould', property_id: '', contact: { name: '', contact_number: '', preferred_contact: 'text' }, evidence: [], submitted_at: real.created_at, simulated: true }, case: { ...real, id, hazard_type: 'damp_mould', severity: 'moderate', is_emergency: false } };
 };
 
 describe('Resident app', () => {
@@ -93,7 +92,7 @@ describe('Resident app', () => {
   });
 
   it('submits a not-listed address through the structured address fields', async () => {
-    const spy = vi.spyOn(mockService, 'createReport').mockImplementation(() => fakeResult('HS-55555'));
+    const spy = vi.spyOn(mockService, 'createReport').mockImplementation(async () => fakeResult('HS-55555'));
     renderPortal();
     await fillToReview({ manualAddress: true });
     fireEvent.click(screen.getByRole('button', { name: /submit repair report/i }));
@@ -101,13 +100,13 @@ describe('Resident app', () => {
     const input = spy.mock.calls[0]![0] as unknown as Record<string, unknown>;
     expect(input.address_line).toBe('3 New Build Mews');
     expect(input.postcode).toBe('S11 8AA');
-    expect(mockService.getState().properties.some((property) => property.id === input.property_id)).toBe(true);
+    expect(input.property_id).toBeUndefined();
   });
 
   it('shows a pending state, blocks double submission and recovers from an error with retry', async () => {
-    const first = deferred<ReturnType<typeof fakeResult>>();
-    const spy = vi.spyOn(homeShieldService, 'createReport')
-      .mockImplementationOnce(() => first.promise)
+    const first = deferred<{ report: Report; case: Case }>();
+    const spy = vi.spyOn(mockService, 'createReport')
+      .mockImplementationOnce(() => first.promise as never)
       .mockImplementationOnce(async () => fakeResult('HS-88888'));
     renderPortal();
     await fillToReview({ withPhoto: true });
@@ -116,9 +115,8 @@ describe('Resident app', () => {
     const pending = await screen.findByRole('button', { name: /sending report/i });
     expect((pending as HTMLButtonElement).disabled).toBe(true);
     expect(spy).toHaveBeenCalledTimes(1);
-    const input = spy.mock.calls[0]![0];
-    const media = spy.mock.calls[0]![1];
-    expect(media?.photos?.[0]).toBeInstanceOf(Blob);
+    const input = spy.mock.calls[0]![0] as unknown as Record<string, unknown>;
+    expect(input.photo).toBeInstanceOf(Blob);
     expect(input.property_id).toBe('p-001');
 
     await act(async () => { first.reject(new Error('500')); await first.promise.catch(() => undefined); });
@@ -156,9 +154,9 @@ describe('Resident app', () => {
     expect(document.body.textContent).not.toMatch(/Hussain/);
     await act(async () => { await mockService.updateJobProgress(job.id, 'on_site'); });
     expect(await screen.findByText('Your operative is at your home')).toBeTruthy();
-    await act(async () => { await mockService.updateJobProgress(job.id, 'unable_to_complete'); });
+    await act(async () => { await mockService.updateJobProgress(job.id, 'unable_to_complete', 'Parts needed'); });
     expect(await screen.findByText('The repair could not be completed on this visit')).toBeTruthy();
-    await act(async () => { await mockService.updateJobProgress(job.id, 'completed'); });
+    await act(async () => { await mockService.updateJobProgress(job.id, 'on_site'); await mockService.updateJobProgress(job.id, 'completed', 'Repaired'); });
     expect(await screen.findByText('Repair completed')).toBeTruthy();
   });
 
