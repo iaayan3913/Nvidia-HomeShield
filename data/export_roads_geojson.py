@@ -1,7 +1,7 @@
 """Export Sheffield roads to frontend/public/roads.geojson for the offline twin.
 
   py data/export_roads_geojson.py              # OSMnx drive network (needs osmnx + internet once)
-  py data/export_roads_geojson.py --major      # only primary..tertiary roads (much smaller file)
+  py data/export_roads_geojson.py --major      # primary..tertiary only -> frontend/public/roads-major.geojson (committed)
   py data/export_roads_geojson.py --fallback   # labelled synthetic skeleton, no dependencies
 
 The OSMnx path also caches data/generated/sheffield_drive.graphml so the travel
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 try:
     from data.sheffield import DISTRICTS, FRONTEND_PUBLIC, GENERATED_DIR, haversine_km
@@ -20,7 +21,8 @@ except ImportError:  # run as `py data/export_roads_geojson.py`
 
 MAJOR = {"motorway", "trunk", "primary", "secondary", "tertiary",
          "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"}
-OUT = FRONTEND_PUBLIC / "roads.geojson"
+OUT = FRONTEND_PUBLIC / "roads.geojson"  # full network, gitignored (5-6 MB)
+OUT_MAJOR = FRONTEND_PUBLIC / "roads-major.geojson"  # major roads, committed so the twin works after a clone
 
 
 def _first(value):
@@ -29,6 +31,7 @@ def _first(value):
 
 def export_osmnx(major_only: bool) -> dict:
     import osmnx as ox
+    ox.settings.cache_folder = str(GENERATED_DIR / "osmnx_cache")  # keep downloads out of the repo root
     graph_path = GENERATED_DIR / "sheffield_drive.graphml"
     if graph_path.exists():
         graph = ox.load_graphml(graph_path)
@@ -75,6 +78,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--major", action="store_true", help="keep only primary..tertiary roads")
     parser.add_argument("--fallback", action="store_true", help="write the labelled synthetic skeleton")
+    parser.add_argument("--out", type=Path, help="output path (default roads.geojson, or roads-major.geojson with --major)")
     args = parser.parse_args()
     collection = None
     if not args.fallback:
@@ -85,9 +89,10 @@ def main() -> None:
     if collection is None:
         collection = export_fallback()
     FRONTEND_PUBLIC.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(collection))
-    size_kb = OUT.stat().st_size / 1024
-    print(f"wrote {len(collection['features'])} road features ({collection['metadata']['source']}, {size_kb:.0f} KB) -> {OUT}")
+    out = args.out or (OUT_MAJOR if args.major else OUT)
+    out.write_text(json.dumps(collection))
+    size_kb = out.stat().st_size / 1024
+    print(f"wrote {len(collection['features'])} road features ({collection['metadata']['source']}, {size_kb:.0f} KB) -> {out}")
 
 
 if __name__ == "__main__":

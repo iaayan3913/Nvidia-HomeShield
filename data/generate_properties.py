@@ -17,9 +17,10 @@ import random
 
 try:
     from data.sheffield import (DISTRICTS, FRONTEND_PUBLIC, GENERATED_DIR, ensure_repo_on_path,
-                                is_plausible_residential)
+                                is_plausible_residential, nearest_graph_nodes)
 except ImportError:  # run as `py data/generate_properties.py`
-    from sheffield import DISTRICTS, FRONTEND_PUBLIC, GENERATED_DIR, ensure_repo_on_path, is_plausible_residential
+    from sheffield import (DISTRICTS, FRONTEND_PUBLIC, GENERATED_DIR, ensure_repo_on_path, is_plausible_residential,
+                           nearest_graph_nodes)
 
 SEED = 4
 DEFAULT_COUNT = 400
@@ -86,7 +87,7 @@ def snap_to_roads(properties: list[dict]) -> int:
         print(f"{graph_path} missing; run data/export_roads_geojson.py first; skipping snap")
         return 0
     graph = ox.load_graphml(graph_path)
-    nodes = ox.distance.nearest_nodes(graph, [p["lon"] for p in properties], [p["lat"] for p in properties])
+    nodes = nearest_graph_nodes(graph, [p["lat"] for p in properties], [p["lon"] for p in properties])
     for prop, node in zip(properties, nodes):
         data = graph.nodes[node]
         prop["lat"], prop["lon"] = round(data["y"], 6), round(data["x"], 6)

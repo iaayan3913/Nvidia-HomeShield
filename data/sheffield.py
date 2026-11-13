@@ -69,6 +69,21 @@ def is_plausible_residential(lat: float, lon: float) -> bool:
     return all(haversine_km((lat, lon), (zlat, zlon)) * 1000 > radius for zlat, zlon, radius, _ in EXCLUSION_ZONES)
 
 
+def nearest_graph_nodes(graph, lats: list[float], lons: list[float]) -> list:
+    """Nearest OSMnx node per point using numpy (avoids osmnx's scikit-learn requirement
+    for unprojected graphs). Equirectangular distance is accurate at city scale."""
+    import numpy as np
+    ids = list(graph.nodes)
+    node_lat = np.array([graph.nodes[n]["y"] for n in ids])
+    node_lon = np.array([graph.nodes[n]["x"] for n in ids])
+    scale = math.cos(math.radians(float(np.mean(node_lat))))
+    nearest = []
+    for lat, lon in zip(lats, lons):
+        d2 = (node_lat - lat) ** 2 + ((node_lon - lon) * scale) ** 2
+        nearest.append(ids[int(np.argmin(d2))])
+    return nearest
+
+
 def ensure_repo_on_path() -> None:
     """Let `py data/<script>.py` import `backend`, `scheduler` and `data` modules."""
     root = str(REPO_ROOT)
