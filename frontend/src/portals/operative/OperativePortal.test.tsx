@@ -74,5 +74,35 @@ describe('operative portal', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/emergency re-plan.*Added: HS-EMERGENCY-1/i);
     expect(screen.getByText('42 Park Hill View')).toBeTruthy();
     expect(screen.getAllByText('Emergency').length).toBeGreaterThan(0);
+    act(() => { mockService.reset(); });
+    expect(screen.queryByText(/approved by Operations/)).toBeTruthy(); // banner stays until dismissed
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss route change' }));
+    expect(screen.queryByText('Your route has changed')).toBeNull();
+  });
+
+  it('does not claim a route change after a demo reset', () => {
+    renderPortal();
+    fireEvent.click(screen.getByRole('button', { name: 'Start travelling' }));
+    act(() => { mockService.reset(); });
+    expect(screen.queryByText('Your route has changed')).toBeNull();
+  });
+
+  it('explains an earlier re-plan when the page is opened afterwards', () => {
+    mockService.approveProposal(mockService.simulateEmergency().proposal.id);
+    renderPortal();
+    expect(screen.getByText(/Your route was updated by an emergency re-plan/)).toBeTruthy();
+  });
+
+  it('returns focus to the actions when the confirmation is cancelled with Escape', async () => {
+    renderPortal();
+    fireEvent.click(screen.getByRole('button', { name: 'Unable to complete' }));
+    fireEvent.keyDown(screen.getByLabelText('What happened'), { key: 'Escape' });
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(document.activeElement?.textContent).toBe('Start travelling');
+  });
+
+  it('defaults to a worker with assignments when no worker is chosen', () => {
+    render(<MemoryRouter initialEntries={['/operative']}><NotificationProvider><OperativePortal /></NotificationProvider></MemoryRouter>);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Dan Clarke');
   });
 });

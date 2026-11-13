@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Ban, Camera, CheckCircle2, CircleDot, Clock, Footprints, KeyRound, MapPin, Navigation, Siren, TriangleAlert, Wrench, X } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
 import { Select, Textarea } from '../../shared/components/FormControls';
@@ -27,6 +27,7 @@ export function JobCard({ item, route, headingLevel = 3 }: { item: WorkItem; rou
   const { notify } = useNotifications();
   const [finishing, setFinishing] = useState<'completed' | 'unable_to_complete' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
   const reference = housingCase?.id ?? job.case_id;
   const step = NEXT_STEP[job.status];
   const finished = isFinished(job.status);
@@ -55,8 +56,8 @@ export function JobCard({ item, route, headingLevel = 3 }: { item: WorkItem; rou
     {route}
 
     {finished ? <p className="op-job__done">{job.status === 'completed' ? 'Completed' : 'Unable to complete'} at {formatTime(job.updated_at)}{job.completion_notes ? <>: <q>{job.completion_notes}</q></> : null}</p>
-      : finishing ? <FinishForm item={item} mode={finishing} onCancel={() => setFinishing(null)} onDone={() => setFinishing(null)} />
-      : <div className="op-actions">
+      : finishing ? <FinishForm item={item} mode={finishing} onCancel={() => { setFinishing(null); requestAnimationFrame(() => actionsRef.current?.querySelector('button')?.focus()); }} onDone={() => setFinishing(null)} />
+      : <div className="op-actions" ref={actionsRef}>
         {step && <Button icon={step.status === 'completed' ? <CheckCircle2 size={20} aria-hidden="true" /> : step.status === 'on_site' ? <Footprints size={20} aria-hidden="true" /> : <Navigation size={20} aria-hidden="true" />}
           onClick={() => step.status === 'completed' ? setFinishing('completed') : advance(step.status)}>{step.label}</Button>}
         <Button variant="secondary" icon={<Ban size={18} aria-hidden="true" />} onClick={() => setFinishing('unable_to_complete')}>Unable to complete</Button>
@@ -89,14 +90,14 @@ function FinishForm({ item, mode, onCancel, onDone }: { item: WorkItem; mode: 'c
     } catch (cause) { setSubmitError(cause instanceof Error ? cause.message : 'The job could not be updated. Your notes are still here; try again.'); }
   }
 
-  return <form className="op-finish" onSubmit={submit} noValidate aria-labelledby={`${photoId}-title`}>
+  return <form className="op-finish" onSubmit={submit} onKeyDown={(e) => { if (e.key === 'Escape') onCancel(); }} noValidate aria-labelledby={`${photoId}-title`}>
     <h4 id={`${photoId}-title`}>{completing ? 'Confirm job completed' : 'Confirm unable to complete'}</h4>
     <p className="op-finish__lead">{completing ? `This marks ${reference} as completed and resolves the case for Operations.` : `This tells Operations ${reference} needs follow-up. It stays on record.`}</p>
     {!completing && <Select label="Reason" value={reason} onChange={(e) => setReason(e.target.value)}>{UNABLE_REASONS.map((r) => <option key={r}>{r}</option>)}</Select>}
     <Textarea label={completing ? 'Completion notes' : 'What happened'} hint="Required. Keep it short; 500 characters maximum." maxLength={500} autoFocus value={notes} error={error ?? undefined}
       onChange={(e) => { setNotes(e.target.value); if (error) setError(null); }} />
     <div className="op-photos">
-      <input id={photoId} className="op-visually-hidden" type="file" accept="image/*" capture="environment" multiple
+      <input id={photoId} className="op-visually-hidden" type="file" accept="image/*" multiple
         onChange={(e) => { const chosen = Array.from(e.target.files ?? []); setPhotos((current) => [...current, ...chosen].slice(0, MAX_PHOTOS)); e.target.value = ''; }} />
       <label htmlFor={photoId} className="button button--secondary"><Camera size={18} aria-hidden="true" />Add photos (optional)</label>
       <p className="field-hint">Photos stay on this device for the demonstration; only the count is recorded.</p>
