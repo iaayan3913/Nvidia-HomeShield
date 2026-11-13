@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from time import monotonic
 from typing import Callable, Protocol
@@ -9,7 +10,10 @@ from typing import Callable, Protocol
 import httpx
 
 from agent.tools import TOOL_NAMES, TOOLS
-from backend.config import AGENT_MAX_ITERATIONS, COMPONENT_TIMEOUT_SECONDS, NEMOCLAW_URL
+from backend.config import (
+    AGENT_MAX_ITERATIONS, AGENT_RUNTIME, COMPONENT_TIMEOUT_SECONDS, NEMOCLAW_URL, USE_MOCKS,
+)
+from backend.llm_client import AgentLLMClient, LLMError
 
 
 class AgentBackend(Protocol):
@@ -23,12 +27,51 @@ class PythonToolAgent:
     executor: Callable[[str, dict], object]
     max_iterations: int = AGENT_MAX_ITERATIONS
     timeout_seconds: float = COMPONENT_TIMEOUT_SECONDS
+    client: AgentLLMClient | None = None
+    use_model: bool = AGENT_RUNTIME == "python" and not USE_MOCKS
+
+    def _actions(self, case_id: str) -> list[tuple[str, dict]]:
+        deterministic = [("compute_deadlines", {"case_id": case_id}),
+                         ("schedule_job", {"case_id": case_id}),
+                         ("request_approval", {"case_id": case_id, "action": "commit_plan"})]
+        if not self.use_model:
+            return deterministic
+        client = self.client or AgentLLMClient()
+        reply = client.complete([
+            {"role": "system", "content": (
+                "Select safe HomeShield backend tools. Return JSON only as "
+                "{\"actions\":[{\"name\":\"tool_name\",\"arguments\":{...}}]}. "
+                "Do not include private reasoning. Consequential actions must request approval.")},
+            {"role": "user", "content": f"Coordinate the next safe actions for case ID {case_id}."},
+        ], temperature=0, timeout=self.timeout_seconds)
+        raw = reply["content"]
+        start, end = raw.find("{"), raw.rfind("}")
+        if start < 0 or end < start:
+            raise LLMError("Agent model did not return a JSON object")
+        try:
+            value = json.loads(raw[start:end + 1])
+        except json.JSONDecodeError as exc:
+            raise LLMError("Agent model returned invalid JSON") from exc
+        actions: list[tuple[str, dict]] = []
+        for item in value.get("actions", []) if isinstance(value, dict) else []:
+            if not isinstance(item, dict) or item.get("name") not in TOOL_NAMES:
+                continue
+            arguments = item.get("arguments") if isinstance(item.get("arguments"), dict) else {}
+            arguments["case_id"] = case_id
+            if item["name"] == "request_approval" and not arguments.get("action"):
+                arguments["action"] = "commit_plan"
+            actions.append((item["name"], arguments))
+        if not actions:
+            raise LLMError("Agent model returned no permitted actions")
+        return actions[:self.max_iterations]
 
     def run(self, case_id: str) -> list[dict]:
         started = monotonic()
-        actions = [("compute_deadlines", {"case_id": case_id}),
-                   ("schedule_job", {"case_id": case_id}),
-                   ("request_approval", {"case_id": case_id, "action": "commit_plan"})]
+        try:
+            actions = self._actions(case_id)
+        except LLMError as exc:
+            return [{"tool": "agent_reasoning", "success": False,
+                     "summary": f"Agent reasoning model unavailable ({type(exc).__name__})"}]
         results: list[dict] = []
         for iteration, (name, arguments) in enumerate(actions):
             if iteration >= self.max_iterations:
@@ -68,3 +111,9 @@ class NemoClawAgent:
         response.raise_for_status()
         value = response.json()
         return value.get("actions", []) if isinstance(value, dict) else []
+
+
+def build_agent(executor: Callable[[str, dict], object]) -> AgentBackend:
+    if AGENT_RUNTIME == "nemoclaw":
+        return NemoClawAgent()
+    return PythonToolAgent(executor=executor, use_model=AGENT_RUNTIME == "python" and not USE_MOCKS)

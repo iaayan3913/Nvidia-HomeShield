@@ -29,7 +29,10 @@ If laptops cannot reach Ollama, use `ssh -L 11434:localhost:11434 user@<spark-ip
 
 ## Solo test
 
-Run `py scripts/spark/check_endpoints.py` from a laptop with `USE_MOCKS=true`, then switch only `LLM_BASE_URL` and `LLM_MODEL` for the Spark test.
+Run `py scripts/spark/check_endpoints.py` from a laptop. `LLM_BASE_URL`/`INTAKE_MODEL`
+select Nano Omni; `AGENT_BASE_URL`/`AGENT_MODEL` select Nemotron Lightning. Keep
+`NEMOCLAW_URL` independent. For tunnels, use local port 18000 for Spark's Omni port 8000 so it
+does not collide with FastAPI on 8001.
 
 ## Checkpoints
 

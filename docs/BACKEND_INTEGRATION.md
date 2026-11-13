@@ -1,8 +1,22 @@
 # Backend integration
 
 The backend is the authoritative owner of cases, deadlines, approvals, plans and audit events.
-Run it from the repository root with `py -3.13 -m uvicorn backend.app:app --reload` on the
+Run it from the repository root with `py -3.13 -m uvicorn backend.app:app --reload --port 8001` on the
 current demo laptop (`py` without a version currently selects a missing 3.14 installation).
+
+## Model endpoints and ports
+
+- Nano Omni intake: Spark port `8000`, configured with `LLM_BASE_URL`, `LLM_API_KEY`, and
+  `INTAKE_MODEL`. From a laptop, prefer `ssh -L 18000:localhost:8000 user@<spark-ip>` and set
+  `LLM_BASE_URL=http://127.0.0.1:18000/v1`.
+- Nemotron Lightning Python agent: Ollama port `11434`, configured independently with
+  `AGENT_BASE_URL`, `AGENT_API_KEY`, and `AGENT_MODEL`. Tunnel with
+  `ssh -L 11434:localhost:11434 user@<spark-ip>` when required.
+- HomeShield FastAPI: port `8001`; set the frontend to `VITE_API_URL=http://127.0.0.1:8001`.
+- NemoClaw remains independent and uses only `NEMOCLAW_URL` in this backend.
+
+If FastAPI runs on the Spark, bind it to `8001`; never bind it to Nano Omni's `8000`. A laptop can
+forward both model ports in one SSH command while leaving local 8001 for its own FastAPI process.
 
 ## Person 1: NemoClaw/runtime
 
@@ -12,6 +26,8 @@ current demo laptop (`py` without a version currently selects a missing 3.14 ins
 - Permit the runtime to call `POST /api/agent/tools/{tool_name}` with a JSON arguments object.
 - The tested fallback is `AGENT_RUNTIME=mock`; `NemoClawAgent` is an untested HTTP seam until the
   runtime contract and sandbox permissions are supplied.
+- For the Python fallback use `AGENT_RUNTIME=python`; it calls the Lightning endpoint for a bounded
+  JSON tool selection and never exposes model reasoning. `AGENT_RUNTIME=mock` stays fully offline.
 
 ## Person 2: intake
 

@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from "react";
 import {createRoot} from "react-dom/client";
 import "./style.css";
-const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8001";
 const colours: Record<string,string> = {emergency:"#ef4444", significant:"#f97316", moderate:"#eab308", routine:"#9ca3af", scheduled:"#3b82f6", resolved:"#22c55e"};
 type Case = {id:string; summary:string; severity:string; status:string; deadlines:{investigate_by?:string}};
 function App() {
