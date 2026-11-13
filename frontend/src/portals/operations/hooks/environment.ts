@@ -83,3 +83,28 @@ export function useElementSize<T extends HTMLElement>() {
   }, [element]);
   return [setElement, size] as const;
 }
+
+/* ------------------------------------------------------------------ theme */
+
+export type ThemeName = 'light' | 'dark';
+const readTheme = (): ThemeName => (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+const subscribeTheme = (callback: () => void) => {
+  if (typeof MutationObserver === 'undefined') return () => undefined;
+  const observer = new MutationObserver(callback);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  return () => observer.disconnect();
+};
+
+/**
+ * Follows `<html data-theme>` (shared contract). CONTRACT-STANDIN: until Platform's pre-paint script is merged,
+ * an absent attribute is set once from the system preference so the portal and map agree on one theme.
+ */
+export function useThemeName(): ThemeName {
+  useEffect(() => {
+    const root = document.documentElement;
+    if (root.dataset.theme) return;
+    const prefersLight = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)').matches;
+    root.dataset.theme = prefersLight ? 'light' : 'dark';
+  }, []);
+  return useSyncExternalStore(subscribeTheme, readTheme, () => 'dark');
+}

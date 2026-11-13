@@ -2,7 +2,7 @@
  * Pure joins over the shared demo state. Every Operations counter, list, plan comparison and
  * timeline entry is derived here from `DemoState`; nothing is stored locally.
  */
-import type { AgentActivity, Approval, Assignment, Case, CaseStatus, DemoState, Job, Property, SchedulePlan, Severity, Worker } from '../../../shared/types/domain';
+import type { AgentActivity, Approval, Assignment, Case, CaseStatus, DemoState, HazardType, Job, Property, SchedulePlan, Severity, Worker } from '../../../shared/types/domain';
 import { HAZARD_LABEL, SEVERITY_LABEL, formatTime, humanise } from './format';
 import type { LonLat } from './geo';
 
@@ -200,7 +200,7 @@ export function comparePlans(active: SchedulePlan | null | undefined, proposal: 
 /* ---------------------------------------------------------------- map scene */
 
 export interface CaseMarker {
-  propertyId: string; position: LonLat; floors: number; severity: Severity; emergency: boolean;
+  propertyId: string; position: LonLat; floors: number; severity: Severity; hazard: HazardType; emergency: boolean;
   caseIds: string[]; primaryCaseId: string; label: string; area: string;
 }
 export interface WorkerMarker { id: string; name: string; role: string; position: LonLat; initials: string; busy: boolean; }
@@ -218,7 +218,7 @@ export function buildCaseMarkers(state: DemoState, lookups: Lookups): CaseMarker
     const property = lookups.properties.get(propertyId); if (!property) continue;
     const sorted = [...cases].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
     const primary = sorted[0]!;
-    markers.push({ propertyId, position: [property.lon, property.lat], floors: property.floors, severity: primary.severity, emergency: sorted.some(isEmergencyCase), caseIds: sorted.map((c) => c.id), primaryCaseId: primary.id, label: sorted.length > 1 ? `${primary.id} +${sorted.length - 1}` : primary.id, area: property.area });
+    markers.push({ propertyId, position: [property.lon, property.lat], floors: property.floors, severity: primary.severity, hazard: primary.hazard_type, emergency: sorted.some(isEmergencyCase), caseIds: sorted.map((c) => c.id), primaryCaseId: primary.id, label: sorted.length > 1 ? `${primary.id} +${sorted.length - 1}` : primary.id, area: property.area });
   }
   // Draw the most severe last so it sits on top.
   return markers.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
@@ -269,10 +269,10 @@ export function buildTimeline(state: DemoState, caseId?: string | null): Timelin
   });
   state.cases.forEach((item) => {
     if (!include(item.id)) return;
-    entries.push({ id: `${item.id}:classification`, at: item.created_at, title: 'Classification proposed', summary: `Simulated classification for ${item.id}: ${HAZARD_LABEL[item.hazard_type]}, ${SEVERITY_LABEL[item.severity].toLowerCase()}. Not an official determination.`, source: 'case record', caseId: item.id, tone: isEmergencyCase(item) ? 'critical' : 'warning', order: 1 });
+    entries.push({ id: `${item.id}:classification`, at: item.created_at, title: 'Classification proposed', summary: `Automated triage suggested ${HAZARD_LABEL[item.hazard_type].toLowerCase()}, ${SEVERITY_LABEL[item.severity].toLowerCase()} for ${item.id}. A housing officer confirms the priority.`, source: 'case record', caseId: item.id, tone: isEmergencyCase(item) ? 'critical' : 'warning', order: 1 });
     const { investigate_by, make_safe_by, start_works_by, review_required } = item.deadlines;
     const dated = [['make safe', make_safe_by], ['investigate', investigate_by], ['start works', start_works_by]].filter(([, at]) => at).map(([label, at]) => `${label} by ${formatTime(at)}`);
-    entries.push({ id: `${item.id}:deadlines`, at: item.created_at, title: 'Deadlines calculated', summary: dated.length ? `Simulated deadlines for ${item.id}: ${dated.join(', ')}.${review_required ? ' Officer review required.' : ''}` : `No deadlines were calculated for ${item.id}. Officer review required.`, source: 'case record', caseId: item.id, tone: 'warning', order: 2 });
+    entries.push({ id: `${item.id}:deadlines`, at: item.created_at, title: 'Deadlines calculated', summary: dated.length ? `Suggested deadlines for ${item.id}: ${dated.join(', ')}.${review_required ? ' Officer review required.' : ''}` : `No deadlines were calculated for ${item.id}. Officer review required.`, source: 'case record', caseId: item.id, tone: 'warning', order: 2 });
   });
   state.approvals.forEach((approval) => {
     if (!include(approval.case_id)) return;
