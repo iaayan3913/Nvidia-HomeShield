@@ -10,9 +10,9 @@
 
 ## Person 1 — Spark, models and NemoClaw
 
-- [ ] **[Person 1 | 10:00-10:15]** Get Spark access; done when SSH or NVIDIA Sync terminal works.
-- [ ] **[Person 1 | 10:15-10:25]** Check GPU, memory and Docker; done when `smoke_test.sh` passes.
-- [ ] **[Person 1 | 10:25-10:35]** Set up GitHub deployment access and remote connections; done when the repo is reachable.
+- [x] **[Person 1 | 10:00-10:15]** Get Spark access; done when SSH or NVIDIA Sync terminal works.
+- [x] **[Person 1 | 10:15-10:25]** Check GPU, memory and Docker; done when `smoke_test.sh` passes.
+- [x] **[Person 1 | 10:25-10:35]** Set up GitHub deployment access and remote connections; done when the repo is reachable.
 - [ ] **[Person 1 | 10:35-10:45]** Check installed Ollama models; done when exact names are recorded privately in `.env`.
 - [ ] **[Person 1 | 10:45-11:30]** Start Nano Omni or the best available vision model; done when Person 2 can call it.
 - [ ] **[Person 1 | 11:30-12:15]** Install/configure NemoClaw with OpenShell; done when one approved tool call succeeds.

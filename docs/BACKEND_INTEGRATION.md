@@ -27,14 +27,28 @@ current demo laptop (`py` without a version currently selects a missing 3.14 ins
 
 ## Person 4: scheduler
 
-- Implement `Scheduler.optimise_schedule(workers, jobs) -> Plan` in the existing scheduler seam.
-- Select `SCHEDULER_ADAPTER=cuopt` or `ortools`; preserve measured `solver_ms`, conflicts and
-  unassigned jobs. The backend persists proposals and requires approval before commitment.
-- The current cuOpt and OR-Tools files are teammate-owned placeholders; only `mock` is tested.
+- Person 4's solver core is integrated. Select `SCHEDULER_ADAPTER=mock`, `ortools`, `cuopt`, or
+  `auto`; set `SCHEDULER_TIME_LIMIT_S` for solver limits and `SCHEDULER_SEED_JOBS=true` to include
+  the 8-worker/36-job offline fixture. Explicit adapters still end in the labelled mock fallback.
+- Inputs are validated `Worker` and `Job` objects. Case-to-job conversion uses the property stock,
+  required skill, duration, compliance/appointment window and priority. Outputs are shared `Plan`
+  objects with measured `solver_ms`, ordered stops/ETAs/coordinates/slack, unassigned jobs and
+  conflicts. `GET /api/workers` supplies worker start coordinates and skills.
+- `SCHEDULER_CLOCK=demo` uses `SCHEDULER_DEMO_START` on the fixture day; use `real` to rebase worker
+  shifts to today. Travel is labelled precomputed data when present, otherwise the labelled
+  haversine fallback.
+- Every plan is persisted first as `approved=false`. `GET /api/plans/latest` returns the newest
+  proposal; `/api/plans/active` returns only the newest approved plan. An emergency warm-starts
+  from that active plan and current worker positions. Approval emits `plan.approved` and
+  `plan.activated`; rejection leaves the prior active plan unchanged.
+- OR-Tools 9.15 is tested on Windows. cuOpt remains an availability-checked adapter and must be
+  verified on DGX Spark with `python3 -m scheduler.cuopt`; no local cuOpt execution is claimed.
 
 ## Person 5: frontend
 
 - REST: `/api/reports`, `/api/cases`, `/api/plans/latest`, `/api/approvals`, and `/api/emergency`.
+- Scheduling REST: `/api/plans/latest` (proposal), `/api/plans/active`, `/api/plans/{id}`, and
+  `/api/workers`. Ordered stop coordinates are the route waypoints; no road geometry is fabricated.
 - Keep JSON text reports unchanged. For media, send `multipart/form-data` with `text`, optional
   `property_id`, and optional `photo`/`audio` file parts. Do not manually set the multipart
   `Content-Type` boundary and do not construct `upload://` references.
@@ -42,6 +56,9 @@ current demo laptop (`py` without a version currently selects a missing 3.14 ins
   or FLAC. Default limits are 10 MiB for photos and 25 MiB for audio.
 - SSE: connect to `/api/stream`; listen for named events (not only `onmessage`). Reconnect with the
   browser-managed `Last-Event-ID`. Events contain safe summaries, not raw reports.
+- Scheduling events are `plan.proposed`, `plan.replan_started`, `plan.replan_completed`,
+  `plan.conflicts`, `plan.failed`, `plan.approved`, `plan.rejected`, and `plan.activated`. Proposal
+  events include the Plan plus `moved`/`added`/`dropped` route changes for map animation.
 - Approval decisions use `POST /api/approvals/{id}/approve` or `/reject` with
   `{"decided_by":"officer-id","reason":"optional"}`.
 

@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from starlette.datastructures import UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from agent.rules import compute_deadlines
 from agent.tools import TOOL_NAMES, TOOLS
@@ -35,11 +36,11 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
     @api.get("/health")
     def health():
         return {"status": "ok", "mocks": USE_MOCKS, "database": "sqlite",
-                "scheduler": SCHEDULER_ADAPTER, "agent_runtime": AGENT_RUNTIME}
+                "scheduler": backend.scheduler_status(), "agent_runtime": AGENT_RUNTIME}
 
-    def report_response(report: ReportIn):
+    async def report_response(report: ReportIn):
         try:
-            case, plan, approval = backend.submit_report(report)
+            case, plan, approval = await run_in_threadpool(backend.submit_report, report)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
         except RuntimeError as exc:
@@ -61,7 +62,7 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
                 report = ReportIn.model_validate(await request.json())
             except (ValueError, ValidationError, json.JSONDecodeError) as exc:
                 raise HTTPException(422, "Invalid JSON report") from exc
-            return report_response(report)
+            return await report_response(report)
         if content_type != "multipart/form-data":
             raise HTTPException(415, "Use application/json or multipart/form-data")
 
@@ -99,7 +100,7 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
             for reference in saved:
                 backend.upload_store.discard(reference)
             raise HTTPException(422, "Invalid multipart report fields") from exc
-        return report_response(report)
+        return await report_response(report)
 
     @api.post("/api/emergency", status_code=201)
     def create_emergency(report: EmergencyIn):
@@ -160,6 +161,24 @@ def create_app(service: HomeShieldService | None = None) -> FastAPI:
         if not plan:
             raise HTTPException(404, "No plan available")
         return plan
+
+    @api.get("/api/plans/active")
+    def active_plan():
+        plan = backend.store.latest_active_plan()
+        if not plan:
+            raise HTTPException(404, "No active plan available")
+        return plan
+
+    @api.get("/api/plans/{plan_id}")
+    def get_plan(plan_id: str):
+        plan = backend.store.get_plan(plan_id)
+        if not plan:
+            raise HTTPException(404, "Plan not found")
+        return plan
+
+    @api.get("/api/workers")
+    def list_workers():
+        return backend.scheduling.workers
 
     @api.get("/api/approvals")
     def list_approvals(status: str | None = Query(default=None, pattern="^(pending|approved|rejected)$")):
