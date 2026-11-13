@@ -27,6 +27,11 @@ export function OperativePortal() {
   const done = items.filter((i) => isFinished(i.job.status));
   const [next, ...later] = open;
   const pending = worker ? pendingProposalCount(state, worker.id) : 0;
+  const plan = state.active_plan;
+  const replanTouchesWorker = Boolean(worker && plan?.kind === 'replan' && plan.changes.some((c) => c.to_worker_id === worker.id || c.from_worker_id === worker.id));
+
+  // Pin the default worker into the URL so identity never shifts on its own as assignments change.
+  useEffect(() => { if (!requested && fallbackId) setParams({ worker: fallbackId }, { replace: true }); }, [requested, fallbackId, setParams]);
 
   // Detect a live route change when an approved plan replaces the one this worker was viewing.
   const [change, setChange] = useState<RouteChange | null>(null);
@@ -38,12 +43,13 @@ export function OperativePortal() {
     if (previous.worker !== worker?.id) { setChange(null); return; }
     if (previous.plan === planId) return;
     const latest = mockService.getState();
+    const approval = latest.approvals.find((a) => a.plan_id === planId && a.status === 'approved');
+    if (!approval) return; // e.g. a demo reset restores the base plan without an officer decision
     const added = jobs.filter((id) => !previous.jobs.includes(id)).map((id) => caseRef(latest, id));
     const removed = previous.jobs.filter((id) => !jobs.includes(id)).map((id) => caseRef(latest, id));
     if (!added.length && !removed.length) return;
     const planKind = latest.active_plan?.kind === 'replan' ? 'An emergency re-plan' : 'A new schedule';
-    const approvedAt = latest.approvals.find((a) => a.plan_id === planId)?.decided_at ?? latest.active_plan?.created_at;
-    setChange({ planKind, added, removed, approvedAt });
+    setChange({ planKind, added, removed, approvedAt: approval.decided_at ?? undefined });
   }, [worker?.id, planId, jobKey]);
 
   if (!state.workers.length) return <div className="op"><Empty icon={Inbox} title="No demonstration operatives">The shared demonstration data has no operatives. Reset the demo from Operations to restore them.</Empty></div>;
@@ -82,6 +88,8 @@ export function OperativePortal() {
       </div>
       <button type="button" className="op-icon-button" onClick={() => setChange(null)} aria-label="Dismiss route change"><X size={18} aria-hidden="true" /></button>
     </div>}
+
+    {!change && replanTouchesWorker && <p className="op-replan-note" role="note"><Route size={18} aria-hidden="true" />Your route was updated by an emergency re-plan approved by Operations{plan ? ` at ${formatTime(state.approvals.find((a) => a.plan_id === plan.id)?.decided_at)}` : ''}.</p>}
 
     {worker && <div className="op-grid">
       <section className="op-next" aria-labelledby="op-next-heading">
