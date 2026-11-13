@@ -7,7 +7,7 @@ from .mock import mock_case
 def analyse_report(text: str, photo_uri: str | None = None, audio_uri: str | None = None,
                    property_id: str | None = None) -> Case:
     if INTAKE_ADAPTER == "mock":
-        return mock_case(text, photo_uri, property_id)
+        return mock_case(text, photo_uri, property_id, audio_uri)
     if INTAKE_ADAPTER == "real":
         try:
             real = import_module("intake.real")

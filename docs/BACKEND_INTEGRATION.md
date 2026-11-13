@@ -16,9 +16,14 @@ current demo laptop (`py` without a version currently selects a missing 3.14 ins
 ## Person 2: intake
 
 - Keep the public signature `analyse_report(text, photo_uri, audio_uri, property_id)`.
-- Add `intake/real.py` with that function and return a `backend.schemas.Case` or compatible dict.
-- Select it with `INTAKE_ADAPTER=real`. Missing/invalid real output returns a clear request error;
-  it never silently claims mock analysis is real.
+- `intake/real.py` is integrated. Select it with `INTAKE_ADAPTER=real`; `LLM_BASE_URL`,
+  `LLM_API_KEY`, and `INTAKE_MODEL` configure its model client.
+- The backend passes validated absolute local paths to the real adapter during inference, then
+  replaces those paths with private opaque evidence references before SQLite persistence.
+- Audio is stored but not submitted by default. Enable `INTAKE_AUDIO_ENABLED=true` only after
+  Person 1 verifies the endpoint's `input_audio` support. A rejected audio part is retried as a
+  text/photo request and visibly recorded as not analysed.
+- Missing/invalid real output returns a clear request error; it never silently uses mock analysis.
 
 ## Person 4: scheduler
 
@@ -30,6 +35,11 @@ current demo laptop (`py` without a version currently selects a missing 3.14 ins
 ## Person 5: frontend
 
 - REST: `/api/reports`, `/api/cases`, `/api/plans/latest`, `/api/approvals`, and `/api/emergency`.
+- Keep JSON text reports unchanged. For media, send `multipart/form-data` with `text`, optional
+  `property_id`, and optional `photo`/`audio` file parts. Do not manually set the multipart
+  `Content-Type` boundary and do not construct `upload://` references.
+- Allowed photos are validated JPEG, PNG, or WebP. Allowed audio is WAV, MP3, Ogg, M4A, WebM,
+  or FLAC. Default limits are 10 MiB for photos and 25 MiB for audio.
 - SSE: connect to `/api/stream`; listen for named events (not only `onmessage`). Reconnect with the
   browser-managed `Last-Event-ID`. Events contain safe summaries, not raw reports.
 - Approval decisions use `POST /api/approvals/{id}/approve` or `/reject` with
@@ -37,3 +47,7 @@ current demo laptop (`py` without a version currently selects a missing 3.14 ins
 
 SSE is deliberately SQLite-polled and single-process-demo oriented. Multiple clients and replay
 work in one process, but production multi-worker fan-out needs a shared broker such as Redis.
+
+Uploads are private files under `UPLOAD_DIRECTORY` (default `data/uploads/`) and are never mounted
+as a public static directory. SQLite stores only the opaque reference, MIME type/size description,
+and processing status.
