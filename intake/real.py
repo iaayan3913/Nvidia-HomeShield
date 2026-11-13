@@ -12,12 +12,13 @@ from backend.schemas import Case, Evidence
 
 class IntakeError(RuntimeError): pass
 
-MODEL_FIELDS = ("hazard_type", "hhsrs_category", "severity", "room", "vulnerable_occupants")
+# hhsrs_category is deliberately not taken from the model: agent/rules.py treats any value as a
+# competent-person classification and skips human review, so it must stay null until a person confirms it.
+MODEL_FIELDS = ("hazard_type", "severity", "room", "vulnerable_occupants")
 
 PROMPT = """You are a social-housing repairs triage assistant. Read the resident's report (and any photo or audio) and extract housing hazards.
 Reply with ONE JSON object only, no prose, using exactly these keys:
 {"hazard_type": "damp_mould|leak|electrical|gas|fire|other",
- "hhsrs_category": "HHSRS hazard name, e.g. 'Damp and mould growth', or null",
  "severity": "routine|moderate|significant|emergency",
  "is_emergency": true or false (immediate risk to health or safety, e.g. gas smell, exposed live wiring, fire, major flooding),
  "room": "room name or null",

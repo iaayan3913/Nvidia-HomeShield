@@ -85,3 +85,9 @@ def test_damp_mould_with_vulnerable_occupants_is_at_least_significant():
     raw = '{"hazard_type":"damp_mould","severity":"moderate","vulnerable_occupants":%s}'
     assert real.parse_case(raw % '["child"]', "r").severity == Severity.significant
     assert real.parse_case(raw % '[]', "r").severity == Severity.moderate
+
+
+def test_model_cannot_confirm_hhsrs_classification():
+    # rules treat hhsrs_category as a professional classification, so the AI's guess must be ignored
+    case = real.parse_case('{"hazard_type":"electrical","severity":"significant","hhsrs_category":"Electrical hazards"}', "r")
+    assert case.hhsrs_category is None
