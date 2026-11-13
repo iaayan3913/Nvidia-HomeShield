@@ -14,8 +14,11 @@ def mock_case(text: str, photo_uri: str | None = None, property_id: str | None =
     else:
         hazard, severity = HazardType.damp_mould, Severity.significant
     vulnerable = [label for label, words in (("child", ("child", "kid", "baby", "toddler", "year-old")),
-                                             ("elderly", ("elderly", "pensioner", "grandparent")))
+                                             ("elderly", ("elderly", "pensioner", "grandparent")),
+                                             ("respiratory_condition", ("asthma", "breathing", "respiratory", "copd")))
                   if any(w in lower for w in words)]
+    if hazard == HazardType.damp_mould and "respiratory_condition" in vulnerable:
+        severity = Severity.emergency  # VERIFY: Awaab's Law guidance example - child's asthma worsened by bedroom mould
     room = next((r for r in ("bedroom", "kitchen", "living room", "bathroom", "hallway") if r in lower), None)
     evidence = [Evidence(kind=kind, uri=uri) for kind, uri in (("photo", photo_uri), ("audio", audio_uri)) if uri]
     return Case(id=f"case-{uuid4().hex[:8]}", hazard_type=hazard, severity=severity,
